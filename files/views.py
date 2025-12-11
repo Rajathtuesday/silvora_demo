@@ -1,4 +1,5 @@
 # files/views.py
+from operator import index
 import os
 import math
 import json
@@ -256,6 +257,8 @@ def resume_upload(request, upload_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_chunk_xchacha(request, upload_id, index):
+    import time
+    start_time = time.time()
     user = get_authenticated_user(request)
     if not user:
         return JsonResponse({"error": "Auth required"}, status=401)
@@ -330,6 +333,10 @@ def upload_chunk_xchacha(request, upload_id, index):
 
     with open(manifest_path, "w", encoding="utf-8") as mf:
         json.dump(manifest, mf, indent=2)
+    
+    duration = time.time() - start_time
+    print(f"🔥 Chunk {index} uploaded in {duration:.2f} seconds (size={request.FILES['chunk'].size} bytes)")
+
 
     return JsonResponse(
         {
