@@ -158,7 +158,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://*.onrender.com",
     "https://silvora.cloud",
     "https://api.silvora.cloud",
-    "https://app.silvora.cloud"
+    "https://app.silvora.cloud",
+    "https://*.onrender.com",
 ]
 
 INSTALLED_APPS = [
