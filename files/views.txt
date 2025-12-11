@@ -1,0 +1,2233 @@
+# # from django.shortcuts import render
+
+# # Create your views here.
+# import json
+# from django.http import JsonResponse,Http404
+# import os
+# from django.conf import settings
+# from django.views.decorators.csrf import csrf_exempt
+# from .models import FileRecord
+# import base64
+# import hashlib
+
+
+
+
+# @csrf_exempt
+# def start_upload(request):
+#     """
+#     Creates a folder: media/uploads/<upload_id>/
+#     Accepts: filename, size, chunk_size
+#     Returns: upload_id, chunk_size
+#     """
+#     import json
+#     import uuid
+
+#     if request.method != "POST":
+#         return JsonResponse({"error": "Use POST"}, status=405)
+
+#     try:
+#         data = json.loads(request.body.decode("utf-8"))
+#     except:
+#         return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+#     filename = data.get("filename")
+#     size = data.get("size")
+#     chunk_size = data.get("chunk_size", 1024 * 1024)  # default: 1MB
+#     manifest = data.get("manifest", {})
+
+
+#     if not filename or not size:
+#         return JsonResponse({"error": "filename and size required"}, status=400)
+
+#     upload_id = str(uuid.uuid4())
+
+#     # Create folders
+#     upload_dir = os.path.join(settings.MEDIA_ROOT, "uploads", upload_id)
+#     chunk_dir = os.path.join(upload_dir, "chunks")
+
+#     os.makedirs(chunk_dir, exist_ok=True)
+    
+#     # Save manifest for this upload
+#     # manifest_path = os.path.join(upload_dir, "manifest.json")
+#     # with open(manifest_path, "w", encoding="utf-8") as f:
+#     #     json.dump(manifest, f, indent=2)
+        
+#     # Save manifest for this upload (ensure filename present)
+#     manifest["filename"] = filename
+#     manifest_path = os.path.join(upload_dir, "manifest.json")
+#     with open(manifest_path, "w", encoding="utf-8") as f:
+#         json.dump(manifest, f, indent=2)
+
+
+
+#     return JsonResponse({
+#         "status": 1,
+#         "message": "Upload session created",
+#         "upload_id": upload_id,
+#         "filename": filename,
+#         "size": size,
+#         "chunk_size": chunk_size,
+#         "manifest": manifest,
+#     })
+
+
+
+
+# @csrf_exempt
+# def upload_chunk(request, upload_id, index):
+#     """
+#     Saves chunk to: media/uploads/<upload_id>/chunks/chunk_<index>.bin
+#     Calculates SHA256 checksum
+#     Updates manifest.json with: index, size, sha256
+#     """
+#     import hashlib
+
+#     if request.method != "PUT":
+#         return JsonResponse({"error": "Use PUT"}, status=405)
+
+#     chunk_bytes = request.body
+#     if not chunk_bytes:
+#         return JsonResponse({"error": "empty chunk"}, status=400)
+
+#     # where chunks will be stored
+#     chunk_dir = os.path.join(settings.MEDIA_ROOT, "uploads", str(upload_id), "chunks")
+#     os.makedirs(chunk_dir, exist_ok=True)
+
+#     # chunk file path
+#     chunk_path = os.path.join(chunk_dir, f"chunk_{index}.bin")
+
+#     # Save chunk to disk
+#     with open(chunk_path, "wb") as f:
+#         f.write(chunk_bytes)
+
+#     # -----------------------
+#     # Calculate SHA256 checksum
+#     # -----------------------
+#     sha256 = hashlib.sha256(chunk_bytes).hexdigest()
+
+#     # -----------------------
+#     # Update manifest.json
+#     # -----------------------
+#     manifest_path = os.path.join(settings.MEDIA_ROOT, "uploads", str(upload_id), "manifest.json")
+
+#     # Load existing manifest
+#     try:
+#         with open(manifest_path, "r", encoding="utf-8") as f:
+#             manifest = json.load(f)
+#     except:
+#         manifest = {}
+
+#     # Ensure "chunks" exists
+#     if "chunks" not in manifest:
+#         manifest["chunks"] = []
+
+#     # Remove existing entry if index already exists (avoid duplicates)
+#     manifest["chunks"] = [c for c in manifest["chunks"] if c["index"] != index]
+
+#     # Add new entry
+#     manifest["chunks"].append({
+#         "index": index,
+#         "size": len(chunk_bytes),
+#         "sha256": sha256
+#     })
+
+#     # Sort chunk metadata by index
+#     manifest["chunks"].sort(key=lambda x: x["index"])
+
+#     # Save manifest
+#     with open(manifest_path, "w", encoding="utf-8") as f:
+#         json.dump(manifest, f, indent=2)
+
+#     # Return response
+#     return JsonResponse({
+#         "status": "stored",
+#         "upload_id": str(upload_id),
+#         "index": index,
+#         "sha256": sha256
+#     })
+
+
+
+# paste/replace finish_upload in project_name/files/views.py
+# files/views.py
+import os
+import json
+import base64
+import hashlib
+import uuid
+from typing import Optional
+
+from django.conf import settings
+from django.http import JsonResponse, HttpResponse, FileResponse, Http404
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.utils.decorators import method_decorator
+
+# Import storage abstraction
+try:
+    from .storage import LocalStorage as StorageClass
+except Exception:
+    # Fallback: inline minimal implementation
+    from .storage import LocalStorage as StorageClass
+
+storage = StorageClass()
+
+
+# ---------------------------
+# Helpers
+# ---------------------------
+def upload_base_dir(upload_id: str):
+    return os.path.join(settings.MEDIA_ROOT, "uploads", str(upload_id))
+
+
+def manifest_path_for(upload_id: str):
+    return os.path.join(upload_base_dir(upload_id), "manifest.json")
+
+
+def compute_manifest_server_hash(manifest_obj: dict) -> str:
+    # deterministically stringify JSON and compute sha256
+    content = json.dumps(manifest_obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(content).hexdigest()
+
+
+# ---------------------------
+# Start upload (create upload_id and manifest)
+# POST /upload/start/
+# ---------------------------
+@csrf_exempt
+@require_http_methods(["POST"])
+def start_upload(request):
+    """
+    Create upload session and manifest file.
+    Accepts JSON: { filename, size, chunk_size, manifest (optional dict) }
+    """
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+    filename = body.get("filename")
+    size = body.get("size")
+    chunk_size = body.get("chunk_size", 1024 * 1024)
+    manifest = body.get("manifest", {})
+
+    if not filename or not size:
+        return JsonResponse({"error": "filename and size required"}, status=400)
+
+    # Optional: if duplicate upload exists with same filename+size return existing upload_id (resume)
+    base = os.path.join(settings.MEDIA_ROOT, "uploads")
+    if os.path.exists(base):
+        for d in os.listdir(base):
+            mp = os.path.join(base, d, "manifest.json")
+            if os.path.exists(mp):
+                try:
+                    with open(mp, "r", encoding="utf-8") as mf:
+                        existing_manifest = json.load(mf)
+                        if existing_manifest.get("filename") == filename and existing_manifest.get("file_size") == size:
+                            return JsonResponse({
+                                "status": 1,
+                                "message": "Upload session already exists",
+                                "upload_id": d,
+                                "filename": filename,
+                                "size": size,
+                                "chunk_size": chunk_size,
+                                "manifest": existing_manifest
+                            })
+                except Exception:
+                    pass
+
+    upload_id = str(uuid.uuid4())
+    upload_dir = upload_base_dir(upload_id)
+    chunk_dir = os.path.join(upload_dir, "chunks")
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    # Build canonical manifest skeleton
+    manifest_obj = {
+        "manifest_version": manifest.get("manifest_version", manifest.get("version", 1)),
+        "encryption": manifest.get("encryption", manifest.get("enc_algo", "none")),
+        "filename": filename,
+        "file_size": size,
+        "chunk_size": chunk_size,
+        "chunks": manifest.get("chunks", []),
+        # optional per-file metadata allowed from client:
+        "file_salt_b64": manifest.get("file_salt_b64") or manifest.get("file_salt") or None,
+    }
+
+    # compute and store server hash
+    manifest_obj["server_hash"] = compute_manifest_server_hash(manifest_obj)
+
+    manifest_path = manifest_path_for(upload_id)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_obj, f, indent=2)
+
+    return JsonResponse({
+        "status": 1,
+        "message": "Upload session created",
+        "upload_id": upload_id,
+        "filename": filename,
+        "size": size,
+        "chunk_size": chunk_size,
+        "manifest": manifest_obj
+    })
+
+
+# ---------------------------
+# Resume endpoint
+# GET /upload/resume/<upload_id>/
+# ---------------------------
+@require_http_methods(["GET"])
+def resume_upload(request, upload_id):
+    upload_dir = upload_base_dir(upload_id)
+    manifest_p = manifest_path_for(upload_id)
+    if not os.path.exists(manifest_p):
+        return JsonResponse({"error": "upload not found"}, status=404)
+
+    try:
+        with open(manifest_p, "r", encoding="utf-8") as mf:
+            manifest = json.load(mf)
+    except:
+        manifest = {}
+
+    present = storage.list_chunks(upload_id)
+    return JsonResponse({
+        "upload_id": str(upload_id),
+        "uploaded_indices": present,
+        "manifest": manifest
+    })
+
+
+# ---------------------------
+# Upload chunk for XChaCha (idempotent)
+# PUT /upload/chunk/<upload_id>/<index>/
+# Headers:
+#   X-Chunk-Nonce : base64 24-byte
+#   X-Chunk-Ciphertext-Sha256 : hex
+# ---------------------------
+@csrf_exempt
+@require_http_methods(["PUT"])
+def upload_chunk_xchacha(request, upload_id, index):
+    # read ciphertext
+    ciphertext = request.body
+    if not ciphertext:
+        return JsonResponse({"error": "empty chunk"}, status=400)
+
+    # headers
+    nonce_b64 = request.META.get("HTTP_X_CHUNK_NONCE")
+    client_sha = request.META.get("HTTP_X_CHUNK_CIPHERTEXT_SHA256")
+
+    if not nonce_b64:
+        return JsonResponse({"error": "Missing X-Chunk-Nonce"}, status=400)
+    try:
+        nonce = base64.b64decode(nonce_b64)
+    except Exception:
+        return JsonResponse({"error": "Invalid nonce base64"}, status=400)
+    if len(nonce) != 24:
+        return JsonResponse({"error": "Nonce must be 24 bytes for XChaCha20"}, status=400)
+
+    # verify checksum if client provided
+    server_sha = hashlib.sha256(ciphertext).hexdigest()
+    if client_sha and client_sha.lower() != server_sha.lower():
+        return JsonResponse({"error": "ciphertext sha mismatch", "expected": server_sha, "got": client_sha}, status=400)
+
+    # Persist ciphertext (idempotent: overwrite existing chunk file)
+    chunk_name = f"chunk_{index}.bin"
+    try:
+        saved_path = storage.save_chunk(upload_id, chunk_name, ciphertext)
+    except Exception as e:
+        return JsonResponse({"error": f"failed to save chunk: {e}"}, status=500)
+
+    # Load manifest and update chunk metadata
+    manifest_p = manifest_path_for(upload_id)
+    try:
+        with open(manifest_p, "r", encoding="utf-8") as mf:
+            manifest = json.load(mf)
+    except Exception:
+        manifest = {}
+
+    if "chunks" not in manifest:
+        manifest["chunks"] = []
+
+    # Remove any old entry for the index
+    manifest["chunks"] = [c for c in manifest["chunks"] if c.get("index") != index]
+
+    # Add the new chunk metadata
+    manifest["chunks"].append({
+        "index": index,
+        "ciphertext_size": len(ciphertext),
+        "nonce_b64": nonce_b64,
+        "ciphertext_sha256": server_sha
+    })
+
+    # Sort and recompute server_hash
+    manifest["chunks"].sort(key=lambda x: x["index"])
+    manifest["server_hash"] = compute_manifest_server_hash(manifest)
+
+    # Save manifest back
+    try:
+        with open(manifest_p, "w", encoding="utf-8") as mf:
+            json.dump(manifest, mf, indent=2)
+    except Exception as e:
+        return JsonResponse({"error": f"failed to update manifest: {e}"}, status=500)
+
+    return JsonResponse({
+        "status": "stored",
+        "upload_id": str(upload_id),
+        "index": index,
+        "ciphertext_sha256": server_sha
+    })
+
+
+# ---------------------------
+# Finish upload: verify manifest & assemble final.bin
+# POST /upload/finish/<upload_id>/
+# ---------------------------
+@csrf_exempt
+@require_http_methods(["POST"])
+def finish_upload(request, upload_id):
+    upload_dir = upload_base_dir(upload_id)
+    manifest_p = manifest_path_for(upload_id)
+
+    if not os.path.exists(manifest_p):
+        return JsonResponse({"error": "manifest missing"}, status=400)
+
+    # Load manifest
+    with open(manifest_p, "r", encoding="utf-8") as mf:
+        manifest = json.load(mf)
+
+    chunks_meta = manifest.get("chunks", [])
+    if not chunks_meta:
+        return JsonResponse({"error": "manifest has no chunks"}, status=400)
+
+    chunk_dir = os.path.join(upload_dir, "chunks")
+
+    # Validate stored chunk files
+    for meta in chunks_meta:
+        idx = meta["index"]
+        expected_size = meta.get("ciphertext_size")
+        chunk_path = os.path.join(chunk_dir, f"chunk_{idx}.bin")
+
+        if not os.path.exists(chunk_path):
+            return JsonResponse({"error": f"chunk_{idx}.bin missing"}, status=400)
+
+        if expected_size is not None:
+            real_size = os.path.getsize(chunk_path)
+            if real_size != expected_size:
+                return JsonResponse({
+                    "error": f"chunk_{idx}.bin size mismatch (expected {expected_size}, got {real_size})"
+                }, status=400)
+
+    # SERVER TAKES CONTROL — compute server_hash
+    manifest_no_hash = {k: manifest[k] for k in manifest if k != "server_hash"}
+    server_hash = compute_manifest_server_hash(manifest_no_hash)
+
+    # Overwrite / store authoritative hash
+    manifest["server_hash"] = server_hash
+
+    # Save updated manifest
+    with open(manifest_p, "w", encoding="utf-8") as mf:
+        json.dump(manifest, mf, indent=2)
+
+    # Assemble final.bin
+    chunks_meta.sort(key=lambda x: x["index"])
+    final_path = os.path.join(upload_dir, "final.bin")
+
+    try:
+        with open(final_path, "wb") as out:
+            for meta in chunks_meta:
+                chunk_path = os.path.join(chunk_dir, f"chunk_{meta['index']}.bin")
+                with open(chunk_path, "rb") as cf:
+                    out.write(cf.read())
+    except Exception as e:
+        return JsonResponse({"error": f"failed to assemble final file: {e}"}, status=500)
+
+    # DB entry (optional)
+    try:
+        from .models import FileRecord
+        record = FileRecord.objects.create(
+            upload_id=upload_id,
+            filename=manifest.get("filename", f"{upload_id}_file"),
+            size=os.path.getsize(final_path),
+            final_path=final_path
+        )
+        file_id = str(record.id)
+    except Exception:
+        file_id = None
+
+    return JsonResponse({
+        "status": 1,
+        "message": "file assembled",
+        "file_id": file_id,
+        "upload_id": str(upload_id),
+        "final_path": final_path,
+        "manifest_url": f"/media/uploads/{upload_id}/manifest.json",
+        "final_url": f"/media/uploads/{upload_id}/final.bin",
+        "chunks": len(chunks_meta)
+    })
+
+
+# ---------------------------
+# Reset uploads - delete everything under MEDIA_ROOT/uploads/
+# POST /upload/reset/
+# ---------------------------
+@csrf_exempt
+@require_http_methods(["POST", "GET"])
+def reset_uploads(request):
+    base_upload_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
+    if os.path.exists(base_upload_dir):
+        for root, dirs, files in os.walk(base_upload_dir, topdown=False):
+            for name in files:
+                try:
+                    os.remove(os.path.join(root, name))
+                except:
+                    pass
+            for name in dirs:
+                try:
+                    os.rmdir(os.path.join(root, name))
+                except:
+                    pass
+    return JsonResponse({"message": "All uploads have been reset", "status": 1})
+
+
+# ---------------------------
+# List files: returns DB records if available
+# GET /upload/files/
+# ---------------------------
+@require_http_methods(["GET"])
+def list_files(request):
+    try:
+        from .models import FileRecord
+        files_qs = FileRecord.objects.all().order_by("-created_at")
+        data = []
+        for f in files_qs:
+            data.append({
+                "file_id": str(f.id),
+                "filename": f.filename,
+                "size": f.size,
+                "upload_id": str(f.upload_id),
+                "path": f.final_path,
+                "created_at": f.created_at.strftime("%Y-%m-%d %H:%M:%S")
+            })
+        return JsonResponse(data, safe=False)
+    except Exception:
+        return JsonResponse([], safe=False)
+
+
+# ---------------------------
+# Download file
+# GET /upload/download/<uuid:file_id>/
+# ---------------------------
+@require_http_methods(["GET"])
+def download_file(request, file_id):
+    try:
+        from .models import FileRecord
+        file = FileRecord.objects.get(id=file_id)
+    except Exception:
+        return JsonResponse({"error": "file not found"}, status=404)
+
+    try:
+        return FileResponse(open(file.final_path, "rb"), as_attachment=True, filename=file.filename)
+    except Exception:
+        return JsonResponse({"error": "could not open file"}, status=500)
+
+
+
+
+
+-------------------------------------------------------------------------------------------------------------------
+# files/views.py
+# import math
+# import os
+# import json
+# import base64
+# import hashlib
+# import shutil
+# import uuid
+# from typing import Optional
+
+# from django.conf import settings
+# from django.http import JsonResponse, HttpResponse, FileResponse, Http404
+# from django.views.decorators.csrf import csrf_exempt
+# from django.views.decorators.http import require_http_methods
+# from django.utils.decorators import method_decorator
+
+# # DRF imports for JWT-authenticated function views
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.permissions import IsAuthenticated
+# from rest_framework_simplejwt.authentication import JWTAuthentication
+# from django.contrib.auth.models import AnonymousUser
+# from .models import FileRecord, FileChunk
+
+# # Import storage abstraction
+# try:
+#     from .storage import LocalStorage as StorageClass
+# except Exception:
+#     # Fallback: inline minimal implementation
+#     from .storage import LocalStorage as StorageClass
+
+# storage = StorageClass()
+
+
+# # ---------------------------
+# # Helpers
+# # ---------------------------
+# def user_root(user_id: str):
+#     return os.path.join(settings.MEDIA_ROOT, "user_files", str(user_id))
+
+# def upload_base_dir(user_id: str, upload_id: str):
+#     return os.path.join(
+#         settings.MEDIA_ROOT, "uploads", str(user_id), str(upload_id)
+#     )
+
+
+# def manifest_path_for(upload_id: str):
+#     return os.path.join(upload_base_dir(upload_id), "manifest.json")
+
+
+# def compute_manifest_server_hash(manifest_obj: dict) -> str:
+#     # deterministically stringify JSON and compute sha256
+#     content = json.dumps(
+#         manifest_obj,
+#         sort_keys=True,
+#         separators=(",", ":"),
+#         ensure_ascii=False,
+#     ).encode("utf-8")
+#     return hashlib.sha256(content).hexdigest()
+
+
+# def get_authenticated_user(request):
+#     """
+#     Manual JWT auth for non-DRF function views (chunk / finish).
+#     """
+#     auth = JWTAuthentication()
+#     try:
+#         user_auth_tuple = auth.authenticate(request)
+#         if not user_auth_tuple:
+#             return None
+#         user, token = user_auth_tuple
+#         return user
+#     except Exception:
+#         return None
+
+
+# # ---------------------------
+# # Start upload (create upload_id and manifest)
+# # POST /upload/start/
+# # ---------------------------
+# # @api_view(["POST"])
+# # @permission_classes([IsAuthenticated])
+# # def start_upload(request):
+# #     """
+# #     Create upload session and manifest file.
+# #     Auth: JWT required (Authorization: Bearer <access>).
+# #     Accepts JSON: { filename, size, chunk_size, manifest (optional dict) }
+# #     """
+# #     body = request.data or {}
+
+# #     filename = body.get("filename")
+# #     size = body.get("size")
+# #     chunk_size = body.get("chunk_size", 1024 * 1024)
+# #     manifest = body.get("manifest", {})
+
+# #     if not filename or not size:
+# #         return JsonResponse({"error": "filename and size required"}, status=400)
+
+# #     # # Optional: resume if same filename+size already exists
+# #     # base = os.path.join(settings.MEDIA_ROOT, "uploads")
+# #     # if os.path.exists(base):
+# #     #     for d in os.listdir(base):
+# #     #         mp = os.path.join(base, d, "manifest.json")
+# #     #         if os.path.exists(mp):
+# #     #             try:
+# #     #                 with open(mp, "r", encoding="utf-8") as mf:
+# #     #                     existing_manifest = json.load(mf)
+# #     #                     if (
+# #     #                         existing_manifest.get("filename") == filename
+# #     #                         and existing_manifest.get("file_size") == size
+# #     #                     ):
+# #     #                         return JsonResponse(
+# #     #                             {
+# #     #                                 "status": 1,
+# #     #                                 "message": "Upload session already exists",
+# #     #                                 "upload_id": d,
+# #     #                                 "filename": filename,
+# #     #                                 "size": size,
+# #     #                                 "chunk_size": chunk_size,
+# #     #                                 "manifest": existing_manifest,
+# #     #                             }
+# #     #                         )
+# #     #             except Exception:
+# #     #                 pass
+
+# #     upload_id = str(uuid.uuid4())
+# #     upload_dir = upload_base_dir(upload_id)
+# #     chunk_dir = os.path.join(upload_dir, "chunks")
+# #     os.makedirs(chunk_dir, exist_ok=True)
+
+# #     # DRF + IsAuthenticated already ensures this, but we keep it explicit
+# #     user = request.user
+# #     if not user or isinstance(user, AnonymousUser):
+# #         return JsonResponse({"error": "Auth required"}, status=401)
+
+# #     # manifest_obj = {
+# #     #     "manifest_version": manifest.get(
+# #     #         "manifest_version", manifest.get("version", 1)
+# #     #     ),
+# #     #     "encryption": manifest.get(
+# #     #         "encryption", manifest.get("enc_algo", "none")
+# #     #     ),
+# #     #     "filename": filename,
+# #     #     "file_size": size,
+# #     #     "chunk_size": chunk_size,
+# #     #     "chunks": manifest.get("chunks", []),
+# #     #     "file_salt_b64": manifest.get("file_salt_b64")
+# #     #     or manifest.get("file_salt")
+# #     #     or None,
+# #     #     "owner": str(user.id),
+# #     # }
+    
+    
+# #     # ----------edited for mvp can be upgraded later ----------------------------
+# #     manifest_obj = {
+# #     "manifest_version": 1,
+# #     "encryption": "standard",        # AES-GCM per-file encryption
+# #     "aead_algorithm": "aes-256-gcm",
+# #     "filename": filename,
+# #     "file_size": size,
+# #     "chunk_size": chunk_size,
+# #     "chunks": [],                    # client fills automatically
+# #     "owner": str(user.id),
+# #     }
+# #     # ------------------------------------
+    
+    
+    
+    
+    
+    
+    
+
+#     # compute and store server hash (without self-reference)
+#     # manifest_obj["server_hash"] = compute_manifest_server_hash(manifest_obj)
+#     # manifest_obj["server_hash"] = compute_manifest_server_hash(manifest_obj)
+
+
+#     # manifest_path = manifest_path_for(upload_id)
+#     # with open(manifest_path, "w", encoding="utf-8") as f:
+#     #     json.dump(manifest_obj, f, indent=2)
+
+#     # return JsonResponse(
+#     #     {
+#     #         "status": 1,
+#     #         "message": "Upload session created",
+#     #         "upload_id": upload_id,
+#     #         "filename": filename,
+#     #         "size": size,
+#     #         "chunk_size": chunk_size,
+#     #         "manifest": manifest_obj,
+#     #     }
+#     # )
+
+
+# # @api_view(["POST"])
+# # @permission_classes([IsAuthenticated])
+# # def start_upload(request):
+# #     """
+# #     Create upload session and manifest file.
+# #     Auth: JWT required (Authorization: Bearer <access>).
+# #     Accepts JSON: { filename, size, chunk_size }
+
+# #     MVP: AES-256-GCM per-file encryption ("standard" profile).
+# #     """
+# #     body = request.data or {}
+
+# #     filename = body.get("filename")
+# #     size = body.get("size")
+# #     chunk_size = body.get("chunk_size", 1024 * 1024)
+
+# #     if not filename or not size:
+# #         return JsonResponse({"error": "filename and size required"}, status=400)
+
+# #     upload_id = str(uuid.uuid4())
+# #     upload_dir = upload_base_dir(user.id, upload_id)
+# #     chunk_dir = os.path.join(upload_dir, "chunks")
+# #     os.makedirs(chunk_dir, exist_ok=True)
+
+# #     user = request.user
+# #     if not user or isinstance(user, AnonymousUser):
+# #         return JsonResponse({"error": "Auth required"}, status=401)
+
+# #     # MVP manifest: explicit version + encryption profile
+# #     manifest_obj = {
+# #         "manifest_version": 1,
+# #         "encryption": "standard",          # logical profile name
+# #         "aead_algorithm": "aes-256-gcm",   # concrete AEAD
+# #         "filename": filename,
+# #         "file_size": size,
+# #         "chunk_size": chunk_size,
+# #         "chunks": [],                      # we don't rely on this for truth
+# #         "owner": str(user.id),
+# #     }
+
+# #     # compute and store server hash (without self-reference)
+# #     manifest_obj["server_hash"] = compute_manifest_server_hash(manifest_obj)
+
+# #     manifest_path = manifest_path_for(upload_id)
+# #     with open(manifest_path, "w", encoding="utf-8") as f:
+# #         json.dump(manifest_obj, f, indent=2)
+
+# #     return JsonResponse(
+# #         {
+# #             "status": 1,
+# #             "message": "Upload session created",
+# #             "upload_id": upload_id,
+# #             "filename": filename,
+# #             "size": size,
+# #             "chunk_size": chunk_size,
+# #             "manifest": manifest_obj,
+# #         }
+# #     )
+
+
+# @api_view(["POST"])
+# @permission_classes([IsAuthenticated])
+# def start_upload(request):
+#     """
+#     Create a new upload session and per-user scoped folder:
+#     MEDIA_ROOT/uploads/<user_id>/<upload_id>/
+#     """
+#     body = request.data or {}
+
+#     filename = body.get("filename")
+#     size = body.get("size")
+#     chunk_size = body.get("chunk_size", 1024 * 1024)
+
+#     if not filename or not size:
+#         return JsonResponse({"error": "filename and size required"}, status=400)
+
+#     user = request.user
+#     if not user or isinstance(user, AnonymousUser):
+#         return JsonResponse({"error": "Auth required"}, status=401)
+
+#     upload_id = str(uuid.uuid4())
+
+#     # NEW: per-user directory structure
+#     upload_dir = upload_base_dir(str(user.id), upload_id)
+#     chunk_dir = os.path.join(upload_dir, "chunks")
+#     os.makedirs(chunk_dir, exist_ok=True)
+
+#     # MVP manifest for AES-GCM per-file encryption
+#     manifest_obj = {
+#         "manifest_version": 1,
+#         "encryption": "standard",
+#         "aead_algorithm": "aes-256-gcm",
+#         "filename": filename,
+#         "file_size": size,
+#         "chunk_size": chunk_size,
+#         "chunks": [],
+#         "owner": str(user.id),
+#     }
+
+#     # Compute server_hash AFTER build
+#     manifest_obj["server_hash"] = compute_manifest_server_hash(
+#         {k: v for k, v in manifest_obj.items() if k != "server_hash"}
+#     )
+
+#     # NEW — per-user manifest path
+#     manifest_path = os.path.join(upload_dir, "manifest.json")
+
+#     with open(manifest_path, "w", encoding="utf-8") as f:
+#         json.dump(manifest_obj, f, indent=2)
+
+#     return JsonResponse({
+#         "status": 1,
+#         "message": "Upload session created",
+#         "upload_id": upload_id,
+#         "filename": filename,
+#         "size": size,
+#         "chunk_size": chunk_size,
+#         "manifest": manifest_obj,
+#     })
+
+
+
+
+
+
+
+
+
+# # ---------------------------
+# # Resume endpoint
+# # GET /upload/resume/<upload_id>/
+# # ---------------------------
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def resume_upload(request, upload_id):
+#     from .models import FileRecord, FileChunk
+    
+#     # Verify access
+#     try:
+#         file_record = FileRecord.objects.get(upload_id=upload_id, owner=request.user)
+#     except FileRecord.DoesNotExist:
+#         return JsonResponse({"error": "upload not found or not allowed"}, status=404)
+
+#     # Load manifest safely
+#     manifest_path = manifest_path_for(upload_id)
+#     if not os.path.exists(manifest_path):
+#         return JsonResponse({"error": "manifest missing"}, status=500)
+
+#     with open(manifest_path, "r", encoding="utf-8") as mf:
+#         manifest = json.load(mf)
+
+#     chunk_size = manifest.get("chunk_size")
+#     file_size = manifest.get("file_size")
+#     total_chunks = math.ceil(file_size / chunk_size)
+
+#     # Query DB for uploaded chunk indices
+#     uploaded_indices = list(
+#         FileChunk.objects.filter(file=file_record)
+#         .values_list("index", flat=True)
+#     )
+
+#     return JsonResponse({
+#         "upload_id": upload_id,
+#         "uploaded_indices": sorted(uploaded_indices),
+#         "total_chunks": total_chunks,
+#         "chunk_size": chunk_size,
+#         "file_size": file_size,
+#     })
+
+
+# # ---------------------------
+# # Upload chunk for XChaCha (idempotent)
+# # POST /upload/chunk/<upload_id>/<index>/
+# # Form-data:
+# #   chunk : encrypted bytes
+# # Headers:
+# #   X-Chunk-Nonce : base64(24 bytes)
+# #   X-Chunk-Ciphertext-Sha256 : hex (optional)
+# #   X-Chunk-Mac-B64 : base64(16 bytes, Poly1305)
+# # ---------------------------
+# # ---------------------------
+# # Upload chunk (POST multipart)
+# # POST /upload/chunk/<upload_id>/<index>/
+
+# # this is production grade 
+# # ---------------------------
+# # @csrf_exempt
+# # @require_http_methods(["POST"])
+# # def upload_chunk_xchacha(request, upload_id, index):
+# #     """
+# #     Upload a single encrypted chunk for an ongoing XChaCha20-Poly1305 upload.
+
+# #     Contract (client MUST honour this):
+# #       - Auth: JWT Bearer token
+# #       - URL:  POST /upload/chunk/<upload_id>/<index>/
+# #       - Form-data:  "chunk" = encrypted bytes
+# #       - Headers:
+# #           X-Chunk-Nonce              : base64(24 bytes)
+# #           X-Chunk-Mac-B64            : base64(16 bytes, Poly1305 tag)
+# #           X-Chunk-Ciphertext-Sha256  : hex string (optional but recommended)
+
+# #     Security goals:
+# #       - Reject unauthenticated / unauthorized uploads
+# #       - Reject missing / malformed crypto metadata
+# #       - Reject empty chunk bodies
+# #       - Forbid writing into a completed upload session
+# #       - Use DB as the only source of truth for which chunks exist
+# #     """
+# #     from .models import FileRecord, FileChunk
+
+# #     # ---------- Auth ----------
+# #     user = get_authenticated_user(request)
+# #     if not user or isinstance(user, AnonymousUser):
+# #         return JsonResponse({"error": "Auth required"}, status=401)
+
+# #     # ---------- Manifest (metadata + ownership) ----------
+# #     manifest_path = manifest_path_for(upload_id)
+# #     if not os.path.exists(manifest_path):
+# #         return JsonResponse({"error": "manifest missing"}, status=404)
+
+# #     try:
+# #         with open(manifest_path, "r", encoding="utf-8") as mf:
+# #             manifest = json.load(mf)
+# #     except Exception:
+# #         return JsonResponse({"error": "failed to read manifest"}, status=500)
+
+# #     # Ownership check
+# #     if str(manifest.get("owner")) != str(user.id):
+# #         return JsonResponse({"error": "ownership mismatch"}, status=403)
+
+# #     # (Optional) enforce encryption mode for this endpoint
+# #     enc_mode = (manifest.get("encryption") or "").lower()
+# #     if enc_mode not in ("xchacha20-poly1305", "xchacha20_poly1305", "xchacha20-poly1305+pbkdf2-sha256"):
+# #         # If you want to allow others, adjust this list or branch on enc_mode.
+# #         return JsonResponse({"error": f"unsupported encryption mode for this endpoint: {enc_mode}"}, status=400)
+
+# #     # ---------- Ensure upload directory ----------
+# #     upload_dir = upload_base_dir(upload_id)
+# #     chunk_dir = os.path.join(upload_dir, "chunks")
+# #     os.makedirs(chunk_dir, exist_ok=True)
+
+# #     # ---------- Resolve / create FileRecord ----------
+# #     file_record = (
+# #         FileRecord.objects
+# #         .filter(upload_id=upload_id, owner=user)
+# #         .order_by("-created_at")
+# #         .first()
+# #     )
+# #     if not file_record:
+# #         file_record = FileRecord.objects.create(
+# #             upload_id=upload_id,
+# #             filename=manifest.get("filename") or f"{upload_id}_file",
+# #             size=manifest.get("file_size"),
+# #             final_path="",
+# #             owner=user,
+# #         )
+
+# #     # Block uploads into a completed session
+# #     if file_record.is_completed:
+# #         return JsonResponse(
+# #             {"error": "upload already completed; no further chunks accepted"},
+# #             status=400,
+# #         )
+
+# #     # ---------- Get and validate chunk body ----------
+# #     chunk_file = request.FILES.get("chunk")
+# #     if not chunk_file:
+# #         return JsonResponse({"error": "missing file part 'chunk'"}, status=400)
+
+# #     ciphertext = chunk_file.read()
+# #     if not ciphertext:
+# #         return JsonResponse({"error": "empty chunk"}, status=400)
+
+# #     # ---------- Crypto headers & validation ----------
+# #     nonce_b64 = request.META.get("HTTP_X_CHUNK_NONCE")
+# #     mac_b64 = request.META.get("HTTP_X_CHUNK_MAC_B64")
+# #     client_sha = request.META.get("HTTP_X_CHUNK_CIPHERTEXT_SHA256")
+
+# #     if not nonce_b64:
+# #         return JsonResponse({"error": "missing X-Chunk-Nonce"}, status=400)
+# #     if not mac_b64:
+# #         return JsonResponse({"error": "missing X-Chunk-Mac-B64"}, status=400)
+
+# #     # Validate nonce length (24 bytes for XChaCha20)
+# #     try:
+# #         nonce = base64.b64decode(nonce_b64)
+# #     except Exception:
+# #         return JsonResponse({"error": "invalid nonce base64"}, status=400)
+# #     if len(nonce) != 24:
+# #         return JsonResponse({"error": "nonce must be 24 bytes for XChaCha20"}, status=400)
+
+# #     # Validate MAC shape (we don't verify tag here, that's done client-side on decrypt)
+# #     try:
+# #         mac = base64.b64decode(mac_b64)
+# #     except Exception:
+# #         return JsonResponse({"error": "invalid mac base64"}, status=400)
+# #     if len(mac) != 16:
+# #         return JsonResponse({"error": "mac must be 16 bytes for Poly1305"}, status=400)
+
+# #     # Optional but recommended integrity: SHA-256 over ciphertext
+# #     server_sha = hashlib.sha256(ciphertext).hexdigest()
+# #     if client_sha and client_sha.lower() != server_sha.lower():
+# #         return JsonResponse({"error": "ciphertext sha256 mismatch"}, status=400)
+
+# #     # ---------- Persist chunk to disk ----------
+# #     try:
+# #         idx_int = int(index)
+# #         if idx_int < 0:
+# #             return JsonResponse({"error": "chunk index must be non-negative"}, status=400)
+# #     except (TypeError, ValueError):
+# #         return JsonResponse({"error": "invalid chunk index"}, status=400)
+
+# #     chunk_path = os.path.join(chunk_dir, f"chunk_{idx_int}.bin")
+# #     try:
+# #         with open(chunk_path, "wb") as f:
+# #             f.write(ciphertext)
+# #     except Exception as e:
+# #         return JsonResponse({"error": f"failed to write chunk: {e}"}, status=500)
+
+# #     # ---------- DB: single source of truth for progress ----------
+# #     FileChunk.objects.update_or_create(
+# #         file=file_record,
+# #         index=idx_int,
+# #         defaults={"size": len(ciphertext)},
+# #     )
+
+# #     # (Optional) you *could* store nonce/sha/mac in FileChunk too
+# #     # by extending the model fields if you want full crypto metadata in DB.
+# #     # For now, they live in the manifest / client context.
+
+# #     return JsonResponse(
+# #         {
+# #             "stored": True,
+# #             "upload_id": upload_id,
+# #             "index": idx_int,
+# #             "size": len(ciphertext),
+# #             "ciphertext_sha256": server_sha,
+# #         },
+# #         status=201,
+# #     )
+
+# #---------------------------------------
+# # mvp grade
+# # --------------------------------------
+# # @csrf_exempt
+# # @require_http_methods(["POST"])
+# # def upload_chunk_xchacha(request, upload_id, index):
+# #     from .models import FileRecord, FileChunk
+
+# #     # Auth required
+# #     user = get_authenticated_user(request)
+# #     if not user:
+# #         return JsonResponse({"error": "Auth required"}, status=401)
+
+# #     # Manifest must exist
+# #     manifest_path = manifest_path_for(upload_id)
+# #     if not os.path.exists(manifest_path):
+# #         return JsonResponse({"error": "manifest missing"}, status=404)
+
+# #     with open(manifest_path, "r", encoding="utf-8") as mf:
+# #         manifest = json.load(mf)
+
+# #     # Ownership check
+# #     if str(manifest.get("owner")) != str(user.id):
+# #         return JsonResponse({"error": "ownership mismatch"}, status=403)
+
+# #     # Ensure directories
+# #     upload_dir = upload_base_dir(upload_id)
+# #     chunk_dir = os.path.join(upload_dir, "chunks")
+# #     os.makedirs(chunk_dir, exist_ok=True)
+
+# #     # Fetch/create FileRecord
+# #     file_record = (
+# #         FileRecord.objects.filter(upload_id=upload_id, owner=user)
+# #         .order_by("-created_at")
+# #         .first()
+# #     )
+# #     if not file_record:
+# #         file_record = FileRecord.objects.create(
+# #             upload_id=upload_id,
+# #             filename=manifest.get("filename"),
+# #             size=manifest.get("file_size"),
+# #             final_path="",
+# #             owner=user,
+# #         )
+
+# #     # Read chunk body
+# #     chunk_file = request.FILES.get("chunk")
+# #     if not chunk_file:
+# #         return JsonResponse({"error": "Missing chunk"}, status=400)
+
+# #     ciphertext = chunk_file.read()
+# #     if not ciphertext:
+# #         return JsonResponse({"error": "empty chunk"}, status=400)
+
+# #     # Save to disk
+# #     idx = int(index)
+# #     chunk_path = os.path.join(chunk_dir, f"chunk_{idx}.bin")
+# #     with open(chunk_path, "wb") as f:
+# #         f.write(ciphertext)
+
+# #     # Track chunk in DB
+# #     FileChunk.objects.update_or_create(
+# #         file=file_record,
+# #         index=idx,
+# #         defaults={"size": len(ciphertext)},
+# #     )
+
+# #     return JsonResponse(
+# #         {
+# #             "stored": True,
+# #             "upload_id": upload_id,
+# #             "index": idx,
+# #             "size": len(ciphertext),
+# #         },
+# #         status=201,
+# #     )
+
+# # files/views.py
+
+# # @csrf_exempt
+# # @require_http_methods(["POST"])
+# # def upload_chunk_xchacha(request, upload_id, index):
+# #     # Manual auth (JWT for function views)
+# #     user = get_authenticated_user(request)
+# #     if not user:
+# #         return JsonResponse({"error": "Auth required"}, status=401)
+
+# #     # Load manifest
+# #     manifest_path = manifest_path_for(upload_id)
+# #     if not os.path.exists(manifest_path):
+# #         return JsonResponse({"error": "manifest missing"}, status=404)
+
+# #     with open(manifest_path, "r", encoding="utf-8") as mf:
+# #         manifest = json.load(mf)
+
+# #     # Ownership check
+# #     if str(manifest.get("owner")) != str(user.id):
+# #         return JsonResponse({"error": "ownership mismatch"}, status=403)
+
+# #     # Ensure per-upload folder exists
+# #     upload_dir = upload_base_dir(user.id, upload_id)
+# #     chunk_dir = os.path.join(upload_dir, "chunks")
+# #     os.makedirs(chunk_dir, exist_ok=True)
+
+# #     # Get file part
+# #     encrypted_file = request.FILES.get("chunk")
+# #     if not encrypted_file:
+# #         return JsonResponse({"error": "Missing file part 'chunk'"}, status=400)
+
+# #     ciphertext = encrypted_file.read()
+# #     if not ciphertext:
+# #         return JsonResponse({"error": "empty chunk"}, status=400)
+
+# #     # Headers
+# #     nonce_b64 = request.META.get("HTTP_X_CHUNK_NONCE")
+# #     mac_b64 = request.META.get("HTTP_X_CHUNK_MAC_B64")
+# #     client_sha = request.META.get("HTTP_X_CHUNK_CIPHERTEXT_SHA256")
+
+# #     # TEMP: allow missing nonce while your Flutter client is still wiring it
+# #     if not nonce_b64:
+# #         nonce_b64 = base64.b64encode(os.urandom(24)).decode("ascii")
+
+# #     try:
+# #         nonce = base64.b64decode(nonce_b64)
+# #     except Exception:
+# #         return JsonResponse({"error": "invalid nonce base64"}, status=400)
+
+# #     if len(nonce) != 24:
+# #         return JsonResponse({"error": "Nonce must be 24 bytes"}, status=400)
+
+# #     # Compute server-side SHA-256 for integrity
+# #     server_sha = hashlib.sha256(ciphertext).hexdigest()
+# #     if client_sha and client_sha.lower() != server_sha.lower():
+# #         return JsonResponse({"error": "sha mismatch"}, status=400)
+
+# #     # Persist chunk
+# #     chunk_path = os.path.join(chunk_dir, f"chunk_{index}.bin")
+# #     with open(chunk_path, "wb") as f:
+# #         f.write(ciphertext)
+
+# #     # Update manifest.chunks (server is source of truth)
+# #     chunks = manifest.get("chunks", [])
+# #     # remove any previous entry with same index
+# #     chunks = [c for c in chunks if int(c.get("index", -1)) != int(index)]
+
+# #     chunks.append(
+# #         {
+# #             "index": int(index),
+# #             "ciphertext_size": len(ciphertext),
+# #             "nonce_b64": nonce_b64,
+# #             "ciphertext_sha256": server_sha,
+# #             "mac_b64": mac_b64,
+# #         }
+# #     )
+
+# #     # Sort by index just to be safe
+# #     chunks.sort(key=lambda c: int(c["index"]))
+# #     manifest["chunks"] = chunks
+
+# #     # Recompute server_hash without self-reference
+# #     manifest_no_hash = {k: v for k, v in manifest.items() if k != "server_hash"}
+# #     manifest["server_hash"] = compute_manifest_server_hash(manifest_no_hash)
+
+# #     with open(manifest_path, "w", encoding="utf-8") as mf:
+# #         json.dump(manifest, mf, indent=2)
+
+# #     return JsonResponse(
+# #         {
+# #             "stored": 1,
+# #             "upload_id": upload_id,
+# #             "index": int(index),
+# #             "size": len(ciphertext),
+# #         },
+# #         status=201,
+# #     )
+
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def upload_chunk_xchacha(request, upload_id, index):
+#     # Manual auth (JWT for function views)
+#     user = get_authenticated_user(request)
+#     if not user:
+#         return JsonResponse({"error": "Auth required"}, status=401)
+
+#     upload_dir = upload_base_dir(str(user.id), str(upload_id))
+#     chunk_dir = os.path.join(upload_dir, "chunks")
+#     manifest_path = os.path.join(upload_dir, "manifest.json")
+
+#     if not os.path.exists(manifest_path):
+#         return JsonResponse({"error": "manifest missing"}, status=404)
+
+#     # Load manifest
+#     with open(manifest_path, "r", encoding="utf-8") as mf:
+#         manifest = json.load(mf)
+
+#     if str(manifest.get("owner")) != str(user.id):
+#         return JsonResponse({"error": "ownership mismatch"}, status=403)
+
+#     os.makedirs(chunk_dir, exist_ok=True)
+
+#     encrypted_file = request.FILES.get("chunk")
+#     if not encrypted_file:
+#         return JsonResponse({"error": "Missing file part 'chunk'"}, status=400)
+
+#     ciphertext = encrypted_file.read()
+#     if not ciphertext:
+#         return JsonResponse({"error": "empty chunk"}, status=400)
+
+#     # Temp workaround: allow missing nonce
+#     nonce_b64 = request.META.get("HTTP_X_CHUNK_NONCE")
+#     if not nonce_b64:
+#         nonce_b64 = base64.b64encode(os.urandom(24)).decode("ascii")
+
+#     try:
+#         nonce = base64.b64decode(nonce_b64)
+#         if len(nonce) != 24:
+#             return JsonResponse({"error": "Nonce must be 24 bytes"}, status=400)
+#     except Exception:
+#         return JsonResponse({"error": "invalid nonce base64"}, status=400)
+
+#     client_sha = request.META.get("HTTP_X_CHUNK_CIPHERTEXT_SHA256")
+#     server_sha = hashlib.sha256(ciphertext).hexdigest()
+#     if client_sha and client_sha.lower() != server_sha.lower():
+#         return JsonResponse({"error": "SHA mismatch"}, status=400)
+
+#     # Save chunk to disk
+#     chunk_path = os.path.join(chunk_dir, f"chunk_{index}.bin")
+#     with open(chunk_path, "wb") as f:
+#         f.write(ciphertext)
+
+#     # Update manifest
+#     chunks = [c for c in manifest.get("chunks", [])
+#               if int(c.get("index", -1)) != int(index)]
+#     chunks.append({
+#         "index": int(index),
+#         "ciphertext_size": len(ciphertext),
+#         "nonce_b64": nonce_b64,
+#         "ciphertext_sha256": server_sha,
+#     })
+#     chunks.sort(key=lambda c: c["index"])
+#     manifest["chunks"] = chunks
+
+#     # Recompute server_hash
+#     manifest_no_hash = {k: v for k, v in manifest.items() if k != "server_hash"}
+#     manifest["server_hash"] = compute_manifest_server_hash(manifest_no_hash)
+
+#     with open(manifest_path, "w", encoding="utf-8") as mf:
+#         json.dump(manifest, mf, indent=2)
+
+#     return JsonResponse({
+#         "stored": 1,
+#         "upload_id": upload_id,
+#         "index": int(index),
+#         "size": len(ciphertext),
+#     }, status=201)
+
+
+
+
+
+# # ---------------------------
+# # Finish upload: verify manifest & assemble final.bin
+# # POST /upload/finish/<upload_id>/
+# # ---------------------------
+
+# # @csrf_exempt
+# # @require_http_methods(["POST"])
+# # def finish_upload(request, upload_id):
+# #     upload_dir = upload_base_dir(upload_id)
+# #     chunk_dir = os.path.join(upload_dir, "chunks")
+# #     manifest_path = manifest_path_for(upload_id)
+
+# #     if not os.path.exists(manifest_path):
+# #         return JsonResponse({"error": "manifest missing"}, status=400)
+
+# #     # Auth first
+# #     user = get_authenticated_user(request)
+# #     if not user or isinstance(user, AnonymousUser):
+# #         return JsonResponse({"error": "Auth required"}, status=401)
+
+# #     # Load manifest for metadata ONLY (not chunk list anymore)
+# #     try:
+# #         with open(manifest_path, "r", encoding="utf-8") as mf:
+# #             manifest = json.load(mf)
+# #     except Exception:
+# #         return JsonResponse({"error": "failed to load manifest"}, status=500)
+
+# #     # Owner verification
+# #     if str(manifest.get("owner")) != str(user.id):
+# #         return JsonResponse({"error": "finish forbidden for this user"}, status=403)
+
+# #     # --- DB as source of truth for chunks ---
+# #     from .models import FileRecord, FileChunk
+
+# #     try:
+# #         file_record = FileRecord.objects.get(upload_id=upload_id, owner=user)
+# #     except FileRecord.DoesNotExist:
+# #         # Should never happen but safety net
+# #         file_record = FileRecord.objects.create(
+# #             upload_id=upload_id,
+# #             filename=manifest.get("filename", f"{upload_id}_file"),
+# #             size=manifest.get("file_size"),
+# #             final_path="",
+# #             owner=user,
+# #         )
+
+# #     chunks = list(file_record.chunks.all())
+# #     if not chunks:
+# #         return JsonResponse({"error": "no chunks uploaded"}, status=400)
+
+# #     chunks.sort(key=lambda c: c.index)
+
+# #     # Ensure no gaps in chunk sequence: 0..N-1
+# #     expected = list(range(len(chunks)))
+# #     received = [c.index for c in chunks]
+# #     if expected != received:
+# #         return JsonResponse(
+# #             {
+# #                 "error": "chunk sequence incomplete",
+# #                 "expected_indices": expected,
+# #                 "received_indices": received,
+# #             },
+# #             status=400,
+# #         )
+
+# #     # Safe assembly - write to temp then atomic rename
+# #     final_path = os.path.join(upload_dir, "final.bin")
+# #     temp_final = final_path + ".tmp"
+
+# #     try:
+# #         with open(temp_final, "wb") as out:
+# #             for c in chunks:
+# #                 chunk_path = os.path.join(chunk_dir, f"chunk_{c.index}.bin")
+# #                 if not os.path.exists(chunk_path):
+# #                     return JsonResponse({"error": f"chunk {c.index} missing on disk"}, status=500)
+
+# #                 with open(chunk_path, "rb") as cf:
+# #                     out.write(cf.read())
+
+# #         os.replace(temp_final, final_path)
+# #     except Exception as e:
+# #         return JsonResponse({"error": f"assembly failed: {e}"}, status=500)
+
+# #     # Update DB record with final path and final size
+# #     final_size = os.path.getsize(final_path)
+# #     file_record.final_path = final_path
+# #     file_record.size = final_size
+# #     file_record.save(update_fields=["final_path", "size"])
+
+# #     return JsonResponse(
+# #         {
+# #             "status": 1,
+# #             "message": "file assembled",
+# #             "file_id": str(file_record.id),
+# #             "upload_id": upload_id,
+# #             "final_path": final_path,
+# #             "chunks": len(chunks),
+# #         }
+# #     )
+
+
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def finish_upload(request, upload_id):
+#     upload_dir = upload_base_dir(user.id, upload_id)
+#     manifest_p = manifest_path_for(upload_id)
+
+#     if not os.path.exists(manifest_p):
+#         return JsonResponse({"error": "manifest missing"}, status=400)
+
+#     user = get_authenticated_user(request)
+#     if not user or isinstance(user, AnonymousUser):
+#         return JsonResponse({"error": "Auth required"}, status=401)
+
+#     # Load manifest
+#     try:
+#         with open(manifest_p, "r", encoding="utf-8") as mf:
+#             manifest = json.load(mf)
+#     except Exception:
+#         return JsonResponse({"error": "failed to load manifest"}, status=500)
+
+#     if str(manifest.get("owner")) != str(user.id):
+#         return JsonResponse({"error": "finish forbidden for this user"}, status=403)
+
+#     chunks_meta = manifest.get("chunks", [])
+#     if not chunks_meta:
+#         return JsonResponse({"error": "manifest has no chunks"}, status=400)
+
+#     chunk_dir = os.path.join(upload_dir, "chunks")
+
+#     # Normalize + sort by index
+#     for m in chunks_meta:
+#         m["index"] = int(m.get("index", 0))
+#     chunks_meta.sort(key=lambda m: m["index"])
+
+#     # Validate continuity: 0..N-1
+#     expected_indices = list(range(len(chunks_meta)))
+#     actual_indices = [m["index"] for m in chunks_meta]
+#     if expected_indices != actual_indices:
+#         return JsonResponse(
+#             {
+#                 "error": "chunk sequence incomplete",
+#                 "expected_indices": expected_indices,
+#                 "received_indices": actual_indices,
+#             },
+#             status=400,
+#         )
+
+#     # Validate files + sha256
+#     for meta in chunks_meta:
+#         idx = meta["index"]
+#         expected_size = int(meta.get("ciphertext_size", 0))
+#         expected_sha = meta.get("ciphertext_sha256")
+
+#         chunk_path = os.path.join(chunk_dir, f"chunk_{idx}.bin")
+#         if not os.path.exists(chunk_path):
+#             return JsonResponse({"error": f"chunk_{idx}.bin missing"}, status=400)
+
+#         ciphertext = open(chunk_path, "rb").read()
+#         real_size = len(ciphertext)
+#         if expected_size and real_size != expected_size:
+#             return JsonResponse(
+#                 {
+#                     "error": f"chunk_{idx}.bin size mismatch "
+#                     f"(expected {expected_size}, got {real_size})"
+#                 },
+#                 status=400,
+#             )
+
+#         sha = hashlib.sha256(ciphertext).hexdigest()
+#         if expected_sha and expected_sha.lower() != sha.lower():
+#             return JsonResponse(
+#                 {
+#                     "error": f"chunk_{idx}.bin sha mismatch",
+#                     "expected_sha": expected_sha,
+#                     "actual_sha": sha,
+#                     "index": idx,
+#                 },
+#                 status=400,
+#             )
+
+#     # Recompute and persist server_hash
+#     manifest_no_hash = {k: v for k, v in manifest.items() if k != "server_hash"}
+#     manifest["server_hash"] = compute_manifest_server_hash(manifest_no_hash)
+#     with open(manifest_p, "w", encoding="utf-8") as mf:
+#         json.dump(manifest, mf, indent=2)
+
+#     # Assemble final.bin (ciphertext concatenation)
+#     final_path = os.path.join(upload_dir, "final.bin")
+#     try:
+#         with open(final_path, "wb") as out:
+#             for meta in chunks_meta:
+#                 idx = meta["index"]
+#                 chunk_path = os.path.join(chunk_dir, f"chunk_{idx}.bin")
+#                 with open(chunk_path, "rb") as cf:
+#                     out.write(cf.read())
+#     except Exception as e:
+#         return JsonResponse(
+#             {"error": f"failed to assemble final file: {e}"}, status=500
+#         )
+
+#     # DB entry
+#     from .models import FileRecord
+
+#     try:
+#         record = FileRecord.objects.create(
+#             upload_id=upload_id,
+#             filename=manifest.get("filename", f"{upload_id}_file"),
+#             size=os.path.getsize(final_path),
+#             final_path=final_path,
+#             owner=user,
+#         )
+#         file_id = str(record.id)
+#     except Exception:
+#         file_id = None
+
+#     return JsonResponse(
+#         {
+#             "status": 1,
+#             "message": "file assembled",
+#             "file_id": file_id,
+#             "upload_id": str(upload_id),
+#             "final_path": final_path,
+#             "chunks": len(chunks_meta),
+#         }
+#     )
+
+
+
+
+
+# # ---------------------------
+# # Reset uploads - delete everything under MEDIA_ROOT/uploads/
+# # POST /upload/reset/
+# # ---------------------------
+# @csrf_exempt
+# @require_http_methods(["POST", "GET"])
+# def reset_uploads(request):
+#     base_upload_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
+#     if os.path.exists(base_upload_dir):
+#         for root, dirs, files in os.walk(base_upload_dir, topdown=False):
+#             for name in files:
+#                 try:
+#                     os.remove(os.path.join(root, name))
+#                 except Exception:
+#                     pass
+#             for name in dirs:
+#                 try:
+#                     os.rmdir(os.path.join(root, name))
+#                 except Exception:
+#                     pass
+#     return JsonResponse({"message": "All uploads have been reset", "status": 1})
+
+
+# # ---------------------------
+# # List files: returns DB records if available
+# # GET /upload/files/
+# # ---------------------------
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.permissions import IsAuthenticated
+
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def list_files(request):
+#     try:
+#         user = request.user  # DRF gives us the authenticated user
+#         from .models import FileRecord
+        
+#         files_qs = FileRecord.objects.filter(owner=user).order_by("-created_at")
+
+#         data = []
+#         for f in files_qs:
+#             data.append({
+#                 "file_id": str(f.id),
+#                 "filename": f.filename,
+#                 "size": f.size,
+#                 "upload_id": str(f.upload_id),
+#                 "path": f.final_path,
+#                 "created_at": f.created_at.strftime("%Y-%m-%d %H:%M:%S")
+#             })
+#         return JsonResponse(data, safe=False)
+#     except Exception as e:
+#         return JsonResponse({"error": str(e)}, status=500)
+
+
+
+# # ---------------------------
+# # Download file
+# # GET /upload/download/<uuid:file_id>/
+# # ---------------------------
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.permissions import IsAuthenticated
+
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def download_file(request, file_id):
+#     from .models import FileRecord
+
+#     try:
+#         file = FileRecord.objects.get(id=file_id, owner=request.user)
+#     except FileRecord.DoesNotExist:
+#         return JsonResponse({"error": "file not found or not yours"}, status=404)
+    
+#     if file.owner_id != request.user.id:
+#         return JsonResponse({"error": "Access denied"}, status=403)
+
+
+#     try:
+#         return FileResponse(open(file.final_path, "rb"), as_attachment=True, filename=file.filename)
+#     except Exception:
+#         return JsonResponse({"error": "could not open file"}, status=500)
+
+
+
+
+# # -------------------
+# # Delete the file 
+
+# # -------------------
+
+# @api_view(["DELETE"])
+# @permission_classes([IsAuthenticated])
+# def delete_upload(request, upload_id):
+#     """
+#     Deletes file record + encrypted file and chunk data on disk.
+#     Auth required.
+#     """
+#     from .models import FileRecord
+
+#     # Does this belong to the user?
+#     try:
+#         record = FileRecord.objects.get(upload_id=str(upload_id), owner=request.user)
+#     except FileRecord.DoesNotExist:
+#         return JsonResponse({"error": "file not found"}, status=404)
+
+#     # Delete final file on disk
+#     if record.final_path and os.path.exists(record.final_path):
+#         try:
+#             os.remove(record.final_path)
+#         except Exception:
+#             pass
+
+#     # Delete the entire upload folder
+#     upload_dir = upload_base_dir(str(upload_id))
+#     shutil.rmtree(upload_dir, ignore_errors=True)
+
+#     # Remove database entry
+#     record.delete()
+
+#     return JsonResponse(
+#         {
+#             "status": 1,
+#             "message": "File deleted",
+#             "upload_id": str(upload_id),
+#         },
+#         status=200
+#     )
+
+---------------------------------------------------------------------------------------------------------------------
+# files/views.py
+import os
+import json
+import math
+import base64
+import hashlib
+import shutil
+import uuid
+from typing import Optional
+
+from django.conf import settings
+from django.http import JsonResponse, FileResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from django.contrib.auth.models import AnonymousUser
+
+from .models import FileRecord, FileChunk  # FileChunk unused for now but kept for future
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def user_root(user_id: str) -> str:
+    return os.path.join(settings.MEDIA_ROOT, "user_files", str(user_id))
+
+
+def upload_base_dir(user_id: str, upload_id: str) -> str:
+    """
+    Per-user upload directory:
+    MEDIA_ROOT/uploads/<user_id>/<upload_id>/
+    """
+    return os.path.join(settings.MEDIA_ROOT, "uploads", str(user_id), str(upload_id))
+
+
+def compute_manifest_server_hash(manifest_obj: dict) -> str:
+    """
+    Deterministically hash manifest (without server_hash itself).
+    """
+    content = json.dumps(
+        manifest_obj,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(content).hexdigest()
+
+
+def get_authenticated_user(request):
+    """
+    Manual JWT auth for non-DRF views (chunk / finish).
+    """
+    auth = JWTAuthentication()
+    try:
+        user_auth_tuple = auth.authenticate(request)
+        if not user_auth_tuple:
+            return None
+        user, token = user_auth_tuple
+        return user
+    except Exception:
+        return None
+
+
+# ============================================================
+# Start upload
+# POST /upload/start/
+# ============================================================
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def start_upload(request):
+    """
+    Create a new upload session.
+
+    Folder layout:
+      MEDIA_ROOT/uploads/<user_id>/<upload_id>/
+        ├─ manifest.json
+        └─ chunks/
+    """
+    body = request.data or {}
+
+    filename = body.get("filename")
+    size = body.get("size")
+    chunk_size = body.get("chunk_size", 1024 * 1024)
+
+    if not filename or not size:
+        return JsonResponse({"error": "filename and size required"}, status=400)
+
+    user = request.user
+    if not user or isinstance(user, AnonymousUser):
+        return JsonResponse({"error": "Auth required"}, status=401)
+
+    upload_id = str(uuid.uuid4())
+    upload_dir = upload_base_dir(str(user.id), upload_id)
+    chunk_dir = os.path.join(upload_dir, "chunks")
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    # MVP manifest, but structured for future crypto upgrades
+    manifest_obj = {
+        "manifest_version": 1,
+        "encryption": "standard",          # logical profile name
+        "aead_algorithm": "aes-256-gcm",   # concrete AEAD
+        "filename": filename,
+        "file_size": size,
+        "chunk_size": chunk_size,
+        "chunks": [],                      # server-managed chunk metadata
+        "owner": str(user.id),
+    }
+
+    # Compute server_hash (without self-reference)
+    manifest_no_hash = dict(manifest_obj)
+    manifest_obj["server_hash"] = compute_manifest_server_hash(manifest_no_hash)
+
+    manifest_path = os.path.join(upload_dir, "manifest.json")
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_obj, f, indent=2)
+
+    return JsonResponse(
+        {
+            "status": 1,
+            "message": "Upload session created",
+            "upload_id": upload_id,
+            "filename": filename,
+            "size": size,
+            "chunk_size": chunk_size,
+            "manifest": manifest_obj,
+        }
+    )
+
+
+# ============================================================
+# Resume upload
+# GET /upload/resume/<upload_id>/
+# ============================================================
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def resume_upload(request, upload_id):
+    """
+    Returns which chunks already exist for this upload_id for this user.
+    Uses manifest.chunks as source of truth.
+    """
+    user = request.user
+    upload_dir = upload_base_dir(str(user.id), str(upload_id))
+    manifest_path = os.path.join(upload_dir, "manifest.json")
+
+    if not os.path.exists(manifest_path):
+        return JsonResponse({"error": "upload not found"}, status=404)
+
+    with open(manifest_path, "r", encoding="utf-8") as mf:
+        manifest = json.load(mf)
+
+    if str(manifest.get("owner")) != str(user.id):
+        return JsonResponse({"error": "not your upload"}, status=403)
+
+    chunk_size = int(manifest.get("chunk_size") or 0)
+    file_size = int(manifest.get("file_size") or 0)
+
+    if not chunk_size or not file_size:
+        return JsonResponse({"error": "invalid manifest sizes"}, status=500)
+
+    total_chunks = math.ceil(file_size / chunk_size)
+    chunks_meta = manifest.get("chunks", [])
+
+    uploaded_indices = sorted(
+        int(c.get("index", -1))
+        for c in chunks_meta
+        if isinstance(c.get("index"), (int, str))
+    )
+
+    return JsonResponse(
+        {
+            "upload_id": str(upload_id),
+            "uploaded_indices": uploaded_indices,
+            "total_chunks": total_chunks,
+            "chunk_size": chunk_size,
+            "file_size": file_size,
+        }
+    )
+
+
+# ============================================================
+# Upload chunk (XChaCha / MVP)
+# POST /upload/chunk/<upload_id>/<index>/
+# ============================================================
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def upload_chunk_xchacha(request, upload_id, index):
+    """
+    Upload one encrypted chunk.
+
+    For now:
+      - Requires JWT (Authorization: Bearer ...)
+      - Stores chunk on disk
+      - Updates manifest["chunks"] with size + sha + nonce.
+    """
+    user = get_authenticated_user(request)
+    if not user:
+        return JsonResponse({"error": "Auth required"}, status=401)
+
+    upload_dir = upload_base_dir(str(user.id), str(upload_id))
+    chunk_dir = os.path.join(upload_dir, "chunks")
+    manifest_path = os.path.join(upload_dir, "manifest.json")
+
+    if not os.path.exists(manifest_path):
+        return JsonResponse({"error": "manifest missing"}, status=404)
+
+    with open(manifest_path, "r", encoding="utf-8") as mf:
+        manifest = json.load(mf)
+
+    if str(manifest.get("owner")) != str(user.id):
+        return JsonResponse({"error": "ownership mismatch"}, status=403)
+
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    encrypted_file = request.FILES.get("chunk")
+    if not encrypted_file:
+        return JsonResponse({"error": "Missing file part 'chunk'"}, status=400)
+
+    ciphertext = encrypted_file.read()
+    if not ciphertext:
+        return JsonResponse({"error": "empty chunk"}, status=400)
+
+    # TEMP: allow missing nonce while Flutter wiring catches up
+    nonce_b64 = request.META.get("HTTP_X_CHUNK_NONCE")
+    if not nonce_b64:
+        nonce_b64 = base64.b64encode(os.urandom(24)).decode("ascii")
+
+    try:
+        nonce = base64.b64decode(nonce_b64)
+        if len(nonce) != 24:
+            return JsonResponse({"error": "Nonce must be 24 bytes"}, status=400)
+    except Exception:
+        return JsonResponse({"error": "invalid nonce base64"}, status=400)
+
+    client_sha = request.META.get("HTTP_X_CHUNK_CIPHERTEXT_SHA256")
+    server_sha = hashlib.sha256(ciphertext).hexdigest()
+    if client_sha and client_sha.lower() != server_sha.lower():
+        return JsonResponse({"error": "SHA mismatch"}, status=400)
+
+    # Persist chunk
+    chunk_path = os.path.join(chunk_dir, f"chunk_{index}.bin")
+    with open(chunk_path, "wb") as f:
+        f.write(ciphertext)
+
+    # Update manifest chunks
+    chunks = [
+        c for c in manifest.get("chunks", [])
+        if int(c.get("index", -1)) != int(index)
+    ]
+    chunks.append(
+        {
+            "index": int(index),
+            "ciphertext_size": len(ciphertext),
+            "nonce_b64": nonce_b64,
+            "ciphertext_sha256": server_sha,
+        }
+    )
+    chunks.sort(key=lambda c: int(c["index"]))
+    manifest["chunks"] = chunks
+
+    # Recompute server_hash
+    manifest_no_hash = {k: v for k, v in manifest.items() if k != "server_hash"}
+    manifest["server_hash"] = compute_manifest_server_hash(manifest_no_hash)
+
+    with open(manifest_path, "w", encoding="utf-8") as mf:
+        json.dump(manifest, mf, indent=2)
+
+    return JsonResponse(
+        {
+            "stored": 1,
+            "upload_id": str(upload_id),
+            "index": int(index),
+            "size": len(ciphertext),
+        },
+        status=201,
+    )
+
+
+# ============================================================
+# Finish upload
+# POST /upload/finish/<upload_id>/
+# ============================================================
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def finish_upload(request, upload_id):
+    """
+    Verify manifest, concat chunk ciphertext into final.bin,
+    and create FileRecord.
+    """
+    user = get_authenticated_user(request)
+    if not user or isinstance(user, AnonymousUser):
+        return JsonResponse({"error": "Auth required"}, status=401)
+
+    upload_dir = upload_base_dir(str(user.id), str(upload_id))
+    manifest_p = os.path.join(upload_dir, "manifest.json")
+
+    if not os.path.exists(manifest_p):
+        return JsonResponse({"error": "manifest missing"}, status=400)
+
+    # Load manifest
+    try:
+        with open(manifest_p, "r", encoding="utf-8") as mf:
+            manifest = json.load(mf)
+    except Exception:
+        return JsonResponse({"error": "failed to load manifest"}, status=500)
+
+    if str(manifest.get("owner")) != str(user.id):
+        return JsonResponse({"error": "finish forbidden for this user"}, status=403)
+
+    chunks_meta = manifest.get("chunks", [])
+    if not chunks_meta:
+        return JsonResponse({"error": "manifest has no chunks"}, status=400)
+
+    chunk_dir = os.path.join(upload_dir, "chunks")
+
+    # Normalize + sort
+    for m in chunks_meta:
+        m["index"] = int(m.get("index", 0))
+    chunks_meta.sort(key=lambda m: m["index"])
+
+    # Ensure contiguous sequence 0..N-1
+    expected_indices = list(range(len(chunks_meta)))
+    actual_indices = [m["index"] for m in chunks_meta]
+    if expected_indices != actual_indices:
+        return JsonResponse(
+            {
+                "error": "chunk sequence incomplete",
+                "expected_indices": expected_indices,
+                "received_indices": actual_indices,
+            },
+            status=400,
+        )
+
+    # Validate chunks on disk
+    for meta in chunks_meta:
+        idx = meta["index"]
+        expected_size = int(meta.get("ciphertext_size", 0))
+        expected_sha = meta.get("ciphertext_sha256")
+
+        chunk_path = os.path.join(chunk_dir, f"chunk_{idx}.bin")
+        if not os.path.exists(chunk_path):
+            return JsonResponse({"error": f"chunk_{idx}.bin missing"}, status=400)
+
+        ciphertext = open(chunk_path, "rb").read()
+        real_size = len(ciphertext)
+        if expected_size and real_size != expected_size:
+            return JsonResponse(
+                {
+                    "error": f"chunk_{idx}.bin size mismatch "
+                    f"(expected {expected_size}, got {real_size})"
+                },
+                status=400,
+            )
+
+        sha = hashlib.sha256(ciphertext).hexdigest()
+        if expected_sha and expected_sha.lower() != sha.lower():
+            return JsonResponse(
+                {
+                    "error": f"chunk_{idx}.bin sha mismatch",
+                    "expected_sha": expected_sha,
+                    "actual_sha": sha,
+                    "index": idx,
+                },
+                status=400,
+            )
+
+    # Refresh server_hash
+    manifest_no_hash = {k: v for k, v in manifest.items() if k != "server_hash"}
+    manifest["server_hash"] = compute_manifest_server_hash(manifest_no_hash)
+    with open(manifest_p, "w", encoding="utf-8") as mf:
+        json.dump(manifest, mf, indent=2)
+
+    # Assemble final.bin
+    final_path = os.path.join(upload_dir, "final.bin")
+    try:
+        with open(final_path, "wb") as out:
+            for meta in chunks_meta:
+                idx = meta["index"]
+                chunk_path = os.path.join(chunk_dir, f"chunk_{idx}.bin")
+                with open(chunk_path, "rb") as cf:
+                    out.write(cf.read())
+    except Exception as e:
+        return JsonResponse(
+            {"error": f"failed to assemble final file: {e}"}, status=500
+        )
+
+    # Create DB record
+    try:
+        record = FileRecord.objects.create(
+            upload_id=str(upload_id),
+            filename=manifest.get("filename", f"{upload_id}_file"),
+            size=os.path.getsize(final_path),
+            final_path=final_path,
+            owner=user,
+        )
+        file_id = str(record.id)
+    except Exception:
+        file_id = None
+
+    return JsonResponse(
+        {
+            "status": 1,
+            "message": "file assembled",
+            "file_id": file_id,
+            "upload_id": str(upload_id),
+            "final_path": final_path,
+            "chunks": len(chunks_meta),
+        }
+    )
+
+
+# ============================================================
+# Reset uploads (dev utility)
+# POST /upload/reset/
+# ============================================================
+
+@csrf_exempt
+@require_http_methods(["POST", "GET"])
+def reset_uploads(request):
+    base_upload_dir = os.path.join(settings.MEDIA_ROOT, "uploads")
+    if os.path.exists(base_upload_dir):
+        for root, dirs, files in os.walk(base_upload_dir, topdown=False):
+            for name in files:
+                try:
+                    os.remove(os.path.join(root, name))
+                except Exception:
+                    pass
+            for name in dirs:
+                try:
+                    os.rmdir(os.path.join(root, name))
+                except Exception:
+                    pass
+    return JsonResponse({"message": "All uploads have been reset", "status": 1})
+
+
+# ============================================================
+# List files for logged-in user
+# GET /upload/files/
+# ============================================================
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def list_files(request):
+    try:
+        user = request.user
+        files_qs = FileRecord.objects.filter(owner=user).order_by("-created_at")
+
+        data = []
+        for f in files_qs:
+            data.append(
+                {
+                    "file_id": str(f.id),
+                    "filename": f.filename,
+                    "size": f.size,
+                    "upload_id": str(f.upload_id),
+                    "path": f.final_path,
+                    "created_at": f.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            )
+        return JsonResponse(data, safe=False)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# ============================================================
+# Download file
+# GET /upload/download/<file_id>/
+# ============================================================
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_file(request, file_id):
+    try:
+        file = FileRecord.objects.get(id=file_id, owner=request.user)
+    except FileRecord.DoesNotExist:
+        return JsonResponse({"error": "file not found or not yours"}, status=404)
+
+    if file.owner_id != request.user.id:
+        return JsonResponse({"error": "Access denied"}, status=403)
+
+    try:
+        return FileResponse(
+            open(file.final_path, "rb"),
+            as_attachment=True,
+            filename=file.filename,
+        )
+    except Exception:
+        return JsonResponse({"error": "could not open file"}, status=500)
+
+
+# ============================================================
+# Delete file (by file_id)
+# DELETE /upload/file/<file_id>/
+# ============================================================
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_file(request, file_id):
+    """
+    Deletes:
+      - final.bin
+      - chunks + manifest (upload folder)
+      - FileRecord row
+    by file_id, for the authenticated user.
+    """
+    try:
+        record = FileRecord.objects.get(id=file_id, owner=request.user)
+    except FileRecord.DoesNotExist:
+        return JsonResponse({"error": "file not found"}, status=404)
+
+    # Prefer the folder that contains final_path
+    upload_dir = None
+    if record.final_path:
+        upload_dir = os.path.dirname(record.final_path)
+
+    if upload_dir and os.path.exists(upload_dir):
+        try:
+            shutil.rmtree(upload_dir, ignore_errors=True)
+        except Exception:
+            pass
+    else:
+        # Fallback: derive from user + upload_id (if set)
+        if record.upload_id:
+            alt_dir = upload_base_dir(str(request.user.id), str(record.upload_id))
+            shutil.rmtree(alt_dir, ignore_errors=True)
+
+    record.delete()
+
+    return JsonResponse(
+        {
+            "status": 1,
+            "message": "File deleted",
+            "file_id": str(file_id),
+        },
+        status=200,
+    )

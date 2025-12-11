@@ -1,0 +1,24 @@
+{
+  "manifest_version": 1,
+  "encryption": "standard",
+  "aead_algorithm": "aes-256-gcm",
+  "filename": "20251209_184122.jpg",
+  "file_size": 3406177,
+  "chunk_size": 2097152,
+  "chunks": [
+    {
+      "index": 0,
+      "ciphertext_size": 2097152,
+      "nonce_b64": "kUUJVuuMbEi2VudQ4w9kHFpJSrI4iUu3",
+      "ciphertext_sha256": "983b7794e55bd5e04d523515403bac980946c6f915b70dbaa748b185366abb08"
+    },
+    {
+      "index": 1,
+      "ciphertext_size": 1309025,
+      "nonce_b64": "zqCgryRpaj9AhluKo2tClV333IZ3ym6E",
+      "ciphertext_sha256": "64ee7fef4a91a48ecc87cafe4ab6023af37f3d33ae686ac5c8d82536ec1ea3bc"
+    }
+  ],
+  "owner": "3",
+  "server_hash": "f9fdced37b775afc4f3831cddfe40ef724664ad9ee630137e8cd6a927996063a"
+}
