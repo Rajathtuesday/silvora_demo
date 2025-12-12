@@ -141,26 +141,153 @@
 # ---------------------------------------------------------------------------
 
 # project_name/settings.py
+# import os
+# from datetime import timedelta
+# from pathlib import Path
+
+# import dj_database_url
+
+# BASE_DIR = Path(__file__).resolve().parent.parent
+
+# SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-key-do-not-use")
+# DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
+
+# ALLOWED_HOSTS = ["*","app.silvora.cloud"]
+
+# CSRF_TRUSTED_ORIGINS = [
+#     "https://*.onrender.com",
+#     "https://silvora.cloud",
+#     "https://api.silvora.cloud",
+#     "https://app.silvora.cloud",
+#     "https://*.onrender.com",
+# ]
+
+# INSTALLED_APPS = [
+#     "django.contrib.admin",
+#     "django.contrib.auth",
+#     "django.contrib.contenttypes",
+#     "django.contrib.sessions",
+#     "django.contrib.messages",
+#     "django.contrib.staticfiles",
+
+#     "rest_framework",
+#     "rest_framework_simplejwt.token_blacklist",
+#     "corsheaders",
+
+#     "files",
+#     "users",
+# ]
+
+# MIDDLEWARE = [
+#     "corsheaders.middleware.CorsMiddleware",
+#     "django.middleware.security.SecurityMiddleware",
+#     "whitenoise.middleware.WhiteNoiseMiddleware",
+#     "django.contrib.sessions.middleware.SessionMiddleware",
+#     "django.middleware.common.CommonMiddleware",
+#     "django.middleware.csrf.CsrfViewMiddleware",
+#     "django.contrib.auth.middleware.AuthenticationMiddleware",
+#     "django.contrib.messages.middleware.MessageMiddleware",
+#     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+# ]
+
+# ROOT_URLCONF = "project_name.urls"
+# WSGI_APPLICATION = "project_name.wsgi.application"
+
+# # DB: Prefer Postgres if DATABASE_URL exists (Render)
+# DATABASES = {
+#     "default": dj_database_url.config(
+#         default=f"sqlite:///{BASE_DIR/'db.sqlite3'}",
+#         conn_max_age=600,
+#         ssl_require=False
+#     )
+# }
+
+# STATIC_URL = "/static/"
+# STATIC_ROOT = BASE_DIR / "staticfiles"
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# MEDIA_URL = "/media/"
+# MEDIA_ROOT = BASE_DIR / "media"
+
+# DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# REST_FRAMEWORK = {
+#     "DEFAULT_AUTHENTICATION_CLASSES": [
+#         "rest_framework_simplejwt.authentication.JWTAuthentication"
+#     ],
+#     "DEFAULT_PERMISSION_CLASSES": [
+#         "rest_framework.permissions.IsAuthenticated"
+#     ],
+# }
+
+# TEMPLATES = [
+#     {
+#         "BACKEND": "django.template.backends.django.DjangoTemplates",
+#         "DIRS": [
+#             BASE_DIR / "templates",  # Allow a custom templates folder
+#         ],
+#         "APP_DIRS": True,
+#         "OPTIONS": {
+#             "context_processors": [
+#                 "django.template.context_processors.debug",
+#                 "django.template.context_processors.request",
+#                 "django.contrib.auth.context_processors.auth",
+#                 "django.contrib.messages.context_processors.messages",
+#             ],
+#         },
+#     },
+# ]
+
+
+
+# SIMPLE_JWT = {
+#     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+#     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+# }
+
+# DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+# FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+
+# CORS_ALLOW_ALL_ORIGINS = True
+
+
+
+
+# ---------------------------------------------------------------------------
+
+# project_name/settings.py 
+# with r2 config at the bottom
 import os
 from datetime import timedelta
 from pathlib import Path
-
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# =====================================================
+# 🔐 SECURITY / ENV CONFIG
+# =====================================================
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-key-do-not-use")
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
-ALLOWED_HOSTS = ["*","app.silvora.cloud"]
+ALLOWED_HOSTS = [
+    "*",
+    "app.silvora.cloud",
+    "silvora.cloud",
+    "silvora-demo.onrender.com",
+]
 
 CSRF_TRUSTED_ORIGINS = [
     "https://*.onrender.com",
     "https://silvora.cloud",
     "https://api.silvora.cloud",
     "https://app.silvora.cloud",
-    "https://*.onrender.com",
 ]
+
+# =====================================================
+# 📦 INSTALLED APPS
+# =====================================================
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -178,6 +305,10 @@ INSTALLED_APPS = [
     "users",
 ]
 
+# =====================================================
+# 🧱 MIDDLEWARE
+# =====================================================
+
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -193,23 +324,35 @@ MIDDLEWARE = [
 ROOT_URLCONF = "project_name.urls"
 WSGI_APPLICATION = "project_name.wsgi.application"
 
-# DB: Prefer Postgres if DATABASE_URL exists (Render)
+# =====================================================
+# 🛢 DATABASE (Render: SQLite or Postgres)
+# =====================================================
+
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR/'db.sqlite3'}",
         conn_max_age=600,
-        ssl_require=False
+        ssl_require=False,
     )
 }
+
+# =====================================================
+# 📁 STATIC & MEDIA — IMPORTANT FOR RENDER
+# =====================================================
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# Media files (local fallback - R2 will override per implementation)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# =====================================================
+# 🔥 DRF / JWT AUTH
+# =====================================================
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -220,32 +363,39 @@ REST_FRAMEWORK = {
     ],
 }
 
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [
-            BASE_DIR / "templates",  # Allow a custom templates folder
-        ],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.debug",
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    },
-]
-
-
-
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
 
-DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
-FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+# =====================================================
+# 🔄 CORS (for Flutter app)
+# =====================================================
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+# OR to restrict later:
+# CORS_ALLOWED_ORIGINS = [
+#     "https://silvora.cloud",
+#     "https://app.silvora.cloud",
+# ]
+
+# =====================================================
+# 📤 UPLOAD LIMITS
+# =====================================================
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100MB
+
+# =====================================================
+# ☁️ CLOUDFLARE R2 CONFIG (used by custom storage backend)
+# =====================================================
+
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
+R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL")
+
+# NOTE:
+# You will plug these values into a custom R2 storage class (provided next)
