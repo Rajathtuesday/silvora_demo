@@ -439,9 +439,11 @@ def finish_upload(request, upload_id):
     manifest["server_hash"] = compute_manifest_server_hash(manifest_no_hash)
     with open(manifest_p, "w", encoding="utf-8") as mf:
         json.dump(manifest, mf, indent=2)
-
-    # Assemble final.bin
+# ---------------------------------------------------------
+    # Assemble final.bin (ciphertext)
+    # ---------------------------------------------------------
     final_path = os.path.join(upload_dir, "final.bin")
+
     try:
         with open(final_path, "wb") as out:
             for meta in chunks_meta:
@@ -454,7 +456,30 @@ def finish_upload(request, upload_id):
             {"error": f"failed to assemble final file: {e}"}, status=500
         )
 
-    # DB entry
+
+    # ---------------------------------------------------------
+    # Upload final.bin → Cloudflare R2
+    # ---------------------------------------------------------
+    from .r2_storage import R2Storage
+    r2 = R2Storage()
+
+    remote_key = f"{user_id}/{upload_id_str}/final.bin"
+
+    try:
+        r2_url = r2.upload_final(final_path, remote_key)
+
+        # Optional cleanup on Render free tier
+        r2.delete_local(final_path)
+
+        stored_path = r2_url
+    except Exception as e:
+        print("🔥 R2 UPLOAD ERROR:", e)
+        stored_path = final_path   # fallback to local file
+
+
+    # ---------------------------------------------------------
+    # Store DB record
+    # ---------------------------------------------------------
     try:
         record, created = FileRecord.objects.get_or_create(
             upload_id=upload_id_str,
@@ -462,29 +487,38 @@ def finish_upload(request, upload_id):
             defaults={
                 "filename": manifest.get("filename", f"{upload_id_str}_file"),
                 "size": os.path.getsize(final_path),
-                "final_path": final_path,
+                "final_path": stored_path,
             },
         )
+
         if not created:
             record.filename = manifest.get("filename", record.filename)
             record.size = os.path.getsize(final_path)
-            record.final_path = final_path
-            record.deleted_at = None  # in case it was restored
+            record.final_path = stored_path
+            record.deleted_at = None
             record.save()
+
         file_id = str(record.id)
-    except Exception:
+
+    except Exception as e:
+        print("🔥 DB ERROR:", e)
         file_id = None
 
+
+    # ---------------------------------------------------------
+    # Response
+    # ---------------------------------------------------------
     return JsonResponse(
         {
             "status": 1,
             "message": "file assembled",
             "file_id": file_id,
             "upload_id": upload_id_str,
-            "final_path": final_path,
+            "final_path": stored_path,
             "chunks": len(chunks_meta),
         }
     )
+
 
 
 # -------------------------------------------------
