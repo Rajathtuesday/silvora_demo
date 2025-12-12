@@ -1,5 +1,7 @@
 # files/urls.py
 from django.urls import path
+
+from project_name.files.views_r2_test import r2_test_upload
 from . import views
 
 urlpatterns = [
@@ -19,4 +21,7 @@ urlpatterns = [
     path("trash/", views.list_trash_files, name="upload-trash-list"),
     path("trash/<uuid:file_id>/restore/", views.restore_upload, name="upload-trash-restore"),
     path("trash/<uuid:file_id>/purge/", views.purge_upload, name="upload-trash-purge"),
+    
+    # r2 test endpoint
+    path("r2-test/",r2_test_upload, name="r2-test-upload"),
 ]
