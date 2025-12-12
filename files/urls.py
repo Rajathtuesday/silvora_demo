@@ -1,7 +1,6 @@
 # files/urls.py
 from django.urls import path
-
-from project_name.files.views_r2_test import r2_test_upload
+from files.views_r2_test import r2_test_upload
 from . import views
 
 urlpatterns = [
