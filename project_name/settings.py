@@ -271,6 +271,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-key-do-not-use")
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
+
 ALLOWED_HOSTS = [
     "*",
     "app.silvora.cloud",
@@ -363,6 +364,27 @@ REST_FRAMEWORK = {
     ],
 }
 
+# =====================================================
+# 🎨 DJANGO TEMPLATES (required for admin + DRF browsable API)
+# =====================================================
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],  # you can leave empty []
+        "APP_DIRS": True,                  # <— REQUIRED for admin and DRF
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
@@ -390,12 +412,17 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024   # 100MB
 # =====================================================
 # ☁️ CLOUDFLARE R2 CONFIG (used by custom storage backend)
 # =====================================================
+# =====================================================
+# ☁️ Cloudflare R2 (MVP - store ONLY final files)
+# =====================================================
 
 R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
-R2_PUBLIC_URL = os.environ.get("R2_PUBLIC_URL")
 
-# NOTE:
-# You will plug these values into a custom R2 storage class (provided next)
+# S3-compatible endpoint
+R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+# For public URL construction (optional)
+R2_PUBLIC_BASE = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com/{R2_BUCKET_NAME}"

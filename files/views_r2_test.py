@@ -1,3 +1,4 @@
+# project_name/files/views_r2_test.py
 import boto3
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -8,10 +9,6 @@ import uuid
 @csrf_exempt
 @require_http_methods(["POST"])
 def r2_test_upload(request):
-    """
-    Simple endpoint to test R2 connectivity.
-    Uploads a single file sent as multipart 'file'
-    """
 
     f = request.FILES.get("file")
     if not f:
@@ -19,7 +16,6 @@ def r2_test_upload(request):
 
     key = f"tests/{uuid.uuid4()}_{f.name}"
 
-    # Cloudflare R2 client
     s3 = boto3.client(
         "s3",
         endpoint_url=settings.R2_ENDPOINT,
@@ -35,8 +31,7 @@ def r2_test_upload(request):
 
     return JsonResponse({
         "status": "ok",
-        "message": "File uploaded to R2",
         "bucket": settings.R2_BUCKET_NAME,
         "key": key,
-        "r2_url": f"{settings.R2_PUBLIC_BASE}/{key}"
+        "url": f"{settings.R2_PUBLIC_BASE}/{key}"
     })
