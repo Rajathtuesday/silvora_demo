@@ -465,7 +465,7 @@ def finish_upload(request, upload_id):
 
     remote_key = f"{user_id}/{upload_id_str}/final.bin"
 
-    try:
+    try:    
         r2_url = r2.upload_final(final_path, remote_key)
 
         # Optional cleanup on Render free tier
