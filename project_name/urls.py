@@ -19,6 +19,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from .healthcheck import healthcheck
 
 # SimpleJWT views
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -36,6 +37,10 @@ urlpatterns = [
     # Files endpoints
     path('upload/', include('files.urls')),
         # NEW: master key endpoints
+        
+    # Healthcheck endpoint
+    path('healthz/', healthcheck, name='healthcheck'),
+    
 ]
 
 # Serve media in development

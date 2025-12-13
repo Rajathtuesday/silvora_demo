@@ -469,7 +469,7 @@ def finish_upload(request, upload_id):
         r2_url = r2.upload_final(final_path, remote_key)
 
         # Optional cleanup on Render free tier
-        r2.delete_local(final_path)
+        # r2.delete_local(final_path)
 
         stored_path = r2_url
     except Exception as e:
