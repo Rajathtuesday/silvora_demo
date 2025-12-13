@@ -478,25 +478,27 @@ def finish_upload(request, upload_id):
 
 
     # ---------------------------------------------------------
-    # Store DB record
+    # Store DB record (MVP-safe, R2-first)
     # ---------------------------------------------------------
+    file_size = sum(m["ciphertext_size"] for m in chunks_meta)
+
     try:
         record, created = FileRecord.objects.get_or_create(
             upload_id=upload_id_str,
             owner=user,
             defaults={
                 "filename": manifest.get("filename", f"{upload_id_str}_file"),
-                "size": os.path.getsize(final_path),
-                "final_path": stored_path,
+                "size": file_size,
+                "final_path": stored_path,  # R2 URL, NOT local path
             },
         )
 
         if not created:
             record.filename = manifest.get("filename", record.filename)
-            record.size = os.path.getsize(final_path)
+            record.size = file_size
             record.final_path = stored_path
             record.deleted_at = None
-            record.save()
+            record.save(update_fields=["filename", "size", "final_path", "deleted_at"])
 
         file_id = str(record.id)
 
