@@ -503,3 +503,34 @@ def fetch_encrypted_thumbnail(request, file_id):
     stream, _ = r2.open_stream(file.thumbnail_key)
 
     return FileResponse(stream, as_attachment=True)
+
+
+# ---------------------------------------------------
+# reset uploads
+# ---------------------------------------------------
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def reset_uploads(request):
+    """
+    ⚠️ DEV / ADMIN ONLY
+    Clears unfinished upload directories for the current user.
+    """
+    user_id = str(request.user.id)
+    base = os.path.join(settings.MEDIA_ROOT, "uploads", user_id)
+
+    if not os.path.exists(base):
+        return JsonResponse({"status": "nothing to reset"})
+
+    removed = 0
+    for name in os.listdir(base):
+        path = os.path.join(base, name)
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+            removed += 1
+
+    return JsonResponse({
+        "status": "ok",
+        "removed_uploads": removed,
+    })
