@@ -49,6 +49,10 @@ urlpatterns = [
     path("trash/<uuid:file_id>/purge/", views.purge_upload, name="upload-trash-purge"),
 
     # R2 Test endpoint
-     # R2 test endpoint
     path("r2-test/", r2_test_upload, name="r2-test-upload"),
+    
+    # Thumbnail upload endpoint(client generated thumbnails)
+    path("<uuid:upload_id>/thumbnail/", views.upload_thumbnail, name="upload-thumbnail"),
+    path("preview/<uuid:file_id>/", views.preview_file, name="upload-preview"),
+    
 ]  
