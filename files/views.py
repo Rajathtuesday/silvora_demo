@@ -485,9 +485,11 @@ def finish_upload(request, upload_id):
             "filename": manifest["filename"],
             "size": offset,
             "storage_type": FileRecord.STORAGE_R2,
-            "storage_key": r2_key,
+            # "storage_key": r2_key,
+            "final_path": r2_key,
             "security_mode": manifest["security_mode"],
             "deleted_at": None,
+            
         },
     )
 
