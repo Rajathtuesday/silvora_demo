@@ -1,0 +1,21 @@
+{
+  "manifest_version": 1,
+  "filename": "Screenshot 2025-11-05 090639.png",
+  "file_size": 266316,
+  "chunk_size": 2097152,
+  "owner": "1",
+  "security_mode": "standard",
+  "encryption": "client_side",
+  "aead_algorithm": "XCHACHA20_POLY1305",
+  "chunks": [
+    {
+      "index": 0,
+      "ciphertext_size": 266316,
+      "ciphertext_sha256": "95bb20d1d7bcdcfee9c2329fff2d8e4f738f3705dec26db9ffd77a997cee9871",
+      "nonce_b64": "z7QcWXYniA6GR88vO7Xo4M31qtmsL4Ee",
+      "mac_b64": "HZueXTs6hOZVpTz4gr827A==",
+      "offset": 0
+    }
+  ],
+  "server_hash": "bb09496b3cc64e02128e8ddf5df3604dc3562f67845194093f4b8cc5f0d2cd75"
+}

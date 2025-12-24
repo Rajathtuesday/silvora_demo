@@ -1,0 +1,43 @@
+{
+  "manifest_version": 1,
+  "filename": "10mb.pdf",
+  "file_size": 10490314,
+  "chunk_size": 2097152,
+  "chunks": [
+    {
+      "index": 0,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "d6fd6c9bf46533a0a3878a6743a717026ae1a87cce75aa7d05928b362d27e8c6"
+    },
+    {
+      "index": 1,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "62ecc9e3421fc1daa4d197895db621470571df730936f88acd0b13fde17d8f98"
+    },
+    {
+      "index": 2,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "f2091a9f3a9693028d0fe3815822ab475dd49194a1754076c72930e84b74c193"
+    },
+    {
+      "index": 3,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "7f526548506b11cc65f723753808cda8c02abcd70ef1ea6d6b94cdd81c4374d2"
+    },
+    {
+      "index": 4,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "381d42ba46466608a4fd538f89d31ad9c87eeff778720f9906d9ae87336a2e82"
+    },
+    {
+      "index": 5,
+      "ciphertext_size": 4554,
+      "ciphertext_sha256": "a6b326ea5d6c5e1a3a7c4358dce27f44acab2671fa8c0dbbe17a1589afc2c64a"
+    }
+  ],
+  "owner": "3",
+  "security_mode": "standard",
+  "encryption": "client_side",
+  "aead_algorithm": "XCHACHA20_POLY1305",
+  "server_hash": "f91c4e41c59656225f0ce701f8c5b84b480202b2a35665c19a69f11bf05a5c9b"
+}

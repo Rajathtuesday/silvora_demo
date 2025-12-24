@@ -1,0 +1,61 @@
+{
+  "manifest_version": 1,
+  "filename": "10mb.pdf",
+  "file_size": 10490314,
+  "chunk_size": 2097152,
+  "owner": "1",
+  "security_mode": "standard",
+  "encryption": "client_side",
+  "aead_algorithm": "XCHACHA20_POLY1305",
+  "chunks": [
+    {
+      "index": 0,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "b962b211cbf52a085b3c549f80fd23bbb68c32ebd376a49d88f3d4139d1e3ed1",
+      "nonce_b64": "j2RNCvoFtL2SecHe7LNn8/TOQHKu6BdA",
+      "mac_b64": "PcfsvY7kmlnFvD2T8Q8xIQ==",
+      "offset": 0
+    },
+    {
+      "index": 1,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "1d8da854809728dd6d97d59c24291665a53c007596469b2ae6ddcce2e8aeb8cb",
+      "nonce_b64": "GXCXmbnv4VDROZsWbKNmluNKWWVQBQtQ",
+      "mac_b64": "9ogOubIXEBRQRro9xsKq3A==",
+      "offset": 2097152
+    },
+    {
+      "index": 2,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "d51d4009123471a805f573e2078ca5f251e7261a2e008643f454a1db9eeca20e",
+      "nonce_b64": "AcGn2pwUVMLdGRitYEegV9XLdk++EZV5",
+      "mac_b64": "PVQqdBuPft75P5exZluh5Q==",
+      "offset": 4194304
+    },
+    {
+      "index": 3,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "891e8ea6f40ddc2026a7dc341ab474ed4b4aef6522a3050828b792799efacc3c",
+      "nonce_b64": "fvL6McepvuR7j0aModATmgPIFG7M/PIk",
+      "mac_b64": "AUJVLEr4uFgCfhIFonRUjw==",
+      "offset": 6291456
+    },
+    {
+      "index": 4,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "bc4d15b955e4db1eb0710f5b60ef6ad66230231503a808fad5fc6837e129c094",
+      "nonce_b64": "LskZNzn1yMNrpeo3g87iVU9El8wA0dMl",
+      "mac_b64": "TzCNUWawiPrrT7MePn8+nQ==",
+      "offset": 8388608
+    },
+    {
+      "index": 5,
+      "ciphertext_size": 4554,
+      "ciphertext_sha256": "a83ec752435751e1e7dc5ce1710efcc2b00e03b1d21f52decc565d20624bc535",
+      "nonce_b64": "37tk80XXlvorZH+QIEV/zAaP5C3vSdtG",
+      "mac_b64": "pnsMx0fwSBJFtQgij5ZO0Q==",
+      "offset": 10485760
+    }
+  ],
+  "server_hash": "d85150480e42fe22f7b382a33eed02a7f4efb48793c56d3bc13bf8b89cc2d77e"
+}
