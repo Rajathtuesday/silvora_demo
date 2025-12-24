@@ -1,3 +1,4 @@
+
 # files/views.py
 
 import os
@@ -14,21 +15,18 @@ from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
-from django.contrib.auth.models import AnonymousUser
 
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from .models import FileRecord, FileChunk
-
+from .models import FileRecord
 
 # ============================================================
 # CONFIG
 # ============================================================
 
 TRASH_RETENTION_DAYS = getattr(settings, "SILVORA_TRASH_RETENTION_DAYS", 30)
-
 
 # ============================================================
 # HELPERS
@@ -37,10 +35,8 @@ TRASH_RETENTION_DAYS = getattr(settings, "SILVORA_TRASH_RETENTION_DAYS", 30)
 def upload_base_dir(user_id: str, upload_id: str) -> str:
     return os.path.join(settings.MEDIA_ROOT, "uploads", user_id, upload_id)
 
-
 def trash_base_dir(user_id: str, upload_id: str) -> str:
     return os.path.join(settings.MEDIA_ROOT, "trash", user_id, upload_id)
-
 
 def compute_manifest_server_hash(manifest: dict) -> str:
     raw = json.dumps(
@@ -50,7 +46,6 @@ def compute_manifest_server_hash(manifest: dict) -> str:
         ensure_ascii=False,
     ).encode("utf-8")
     return hashlib.sha256(raw).hexdigest()
-
 
 def get_authenticated_user(request):
     auth = JWTAuthentication()
@@ -63,7 +58,6 @@ def get_authenticated_user(request):
     except Exception:
         return None
 
-
 def _purge_file_record(record: FileRecord):
     user_id = str(record.owner_id)
     upload_id = str(record.upload_id)
@@ -73,13 +67,11 @@ def _purge_file_record(record: FileRecord):
 
     record.delete()
 
-
 def _auto_purge_trash_for_user(user):
     cutoff = timezone.now() - timedelta(days=TRASH_RETENTION_DAYS)
     old = FileRecord.objects.filter(owner=user, deleted_at__lt=cutoff)
     for r in old:
         _purge_file_record(r)
-
 
 # ============================================================
 # START UPLOAD
@@ -92,11 +84,8 @@ def start_upload(request):
 
     filename = body.get("filename")
     size = body.get("size")
-    chunk_size = body.get("chunk_size", 1024 * 1024)
-    security_mode = body.get(
-        "security_mode",
-        FileRecord.SECURITY_STANDARD,
-    )
+    chunk_size = body.get("chunk_size", 2 * 1024 * 1024)
+    security_mode = body.get("security_mode", FileRecord.SECURITY_STANDARD)
 
     if not filename or not size:
         return JsonResponse({"error": "filename and size required"}, status=400)
@@ -107,9 +96,8 @@ def start_upload(request):
     ):
         return JsonResponse({"error": "invalid security_mode"}, status=400)
 
-    user = request.user
     upload_id = str(uuid.uuid4())
-    user_id = str(user.id)
+    user_id = str(request.user.id)
 
     base_dir = upload_base_dir(user_id, upload_id)
     os.makedirs(os.path.join(base_dir, "chunks"), exist_ok=True)
@@ -119,11 +107,11 @@ def start_upload(request):
         "filename": filename,
         "file_size": size,
         "chunk_size": chunk_size,
-        "chunks": [],
         "owner": user_id,
         "security_mode": security_mode,
         "encryption": "client_side",
         "aead_algorithm": "XCHACHA20_POLY1305",
+        "chunks": [],
     }
 
     manifest["server_hash"] = compute_manifest_server_hash(
@@ -133,14 +121,11 @@ def start_upload(request):
     with open(os.path.join(base_dir, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)
 
-    return JsonResponse(
-        {
-            "status": 1,
-            "upload_id": upload_id,
-            "manifest": manifest,
-        }
-    )
-
+    return JsonResponse({
+        "status": 1,
+        "upload_id": upload_id,
+        "manifest": manifest,
+    })
 
 # ============================================================
 # RESUME UPLOAD
@@ -149,48 +134,33 @@ def start_upload(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def resume_upload(request, upload_id):
-    user = request.user
-    user_id = str(user.id)
-    upload_id = str(upload_id)
-
-    record = get_object_or_404(
-        FileRecord,
-        upload_id=upload_id,
-        owner=user,
-        deleted_at__isnull=True,
-    )
-
-    manifest_path = os.path.join(
-        upload_base_dir(user_id, upload_id),
-        "manifest.json",
-    )
+    user_id = str(request.user.id)
+    base_dir = upload_base_dir(user_id, str(upload_id))
+    manifest_path = os.path.join(base_dir, "manifest.json")
 
     if not os.path.exists(manifest_path):
-        return JsonResponse({"error": "manifest missing"}, status=404)
+        return JsonResponse({
+            "uploaded_indices": [],
+        })
 
     with open(manifest_path) as f:
         manifest = json.load(f)
 
-    chunk_size = manifest["chunk_size"]
-    total_chunks = math.ceil(manifest["file_size"] / chunk_size)
+    uploaded = [c["index"] for c in manifest.get("chunks", [])]
 
-    uploaded = list(
-        FileChunk.objects.filter(file=record).values_list("index", flat=True)
+    total_chunks = math.ceil(
+        manifest["file_size"] / manifest["chunk_size"]
     )
 
-    return JsonResponse(
-        {
-            "upload_id": upload_id,
-            "uploaded_indices": sorted(uploaded),
-            "total_chunks": total_chunks,
-            "chunk_size": chunk_size,
-            "security_mode": manifest["security_mode"],
-        }
-    )
-
+    return JsonResponse({
+        "uploaded_indices": sorted(uploaded),
+        "total_chunks": total_chunks,
+        "chunk_size": manifest["chunk_size"],
+        "security_mode": manifest["security_mode"],
+    })
 
 # ============================================================
-# UPLOAD CHUNK (OPAQUE)
+# UPLOAD CHUNK (OPAQUE ENCRYPTED)
 # ============================================================
 
 @csrf_exempt
@@ -200,25 +170,21 @@ def upload_chunk_xchacha(request, upload_id, index):
     if not user:
         return JsonResponse({"error": "auth required"}, status=401)
 
-    user_id = str(user.id)
-    upload_id = str(upload_id)
-    index = int(index)
-
-    base_dir = upload_base_dir(user_id, upload_id)
+    base_dir = upload_base_dir(str(user.id), str(upload_id))
     manifest_path = os.path.join(base_dir, "manifest.json")
 
     if not os.path.exists(manifest_path):
         return JsonResponse({"error": "manifest missing"}, status=404)
 
-    with open(manifest_path) as f:
-        manifest = json.load(f)
-
-    if manifest["owner"] != user_id:
-        return JsonResponse({"error": "forbidden"}, status=403)
-
     blob = request.FILES.get("chunk")
     if not blob:
         return JsonResponse({"error": "missing chunk"}, status=400)
+
+    nonce_b64 = request.headers.get("X-Chunk-Nonce")
+    mac_b64 = request.headers.get("X-Chunk-Mac")
+
+    if not nonce_b64 or not mac_b64:
+        return JsonResponse({"error": "missing crypto headers"}, status=400)
 
     data = blob.read()
     sha = hashlib.sha256(data).hexdigest()
@@ -227,15 +193,20 @@ def upload_chunk_xchacha(request, upload_id, index):
     with open(chunk_path, "wb") as f:
         f.write(data)
 
+    with open(manifest_path) as f:
+        manifest = json.load(f)
+
     manifest["chunks"] = [
         c for c in manifest["chunks"] if c["index"] != index
     ] + [{
         "index": index,
         "ciphertext_size": len(data),
         "ciphertext_sha256": sha,
+        "nonce_b64": nonce_b64,
+        "mac_b64": mac_b64,
     }]
 
-    manifest["chunks"].sort(key=lambda x: x["index"])
+    manifest["chunks"].sort(key=lambda c: c["index"])
     manifest["server_hash"] = compute_manifest_server_hash(
         {k: v for k, v in manifest.items() if k != "server_hash"}
     )
@@ -243,12 +214,188 @@ def upload_chunk_xchacha(request, upload_id, index):
     with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
 
-    return JsonResponse({"stored": 1, "index": index})
-
+    return JsonResponse({"stored": True, "index": index})
 
 # ============================================================
-# FINISH UPLOAD
+# FINISH UPLOAD (VERIFY + SEAL)
 # ============================================================
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def finish_upload(request, upload_id):
+#     user = get_authenticated_user(request)
+#     if not user:
+#         return JsonResponse({"error": "auth required"}, status=401)
+
+#     user_id = str(user.id)
+#     upload_id = str(upload_id)
+#     base_dir = upload_base_dir(user_id, upload_id)
+
+#     manifest_path = os.path.join(base_dir, "manifest.json")
+#     if not os.path.exists(manifest_path):
+#         return JsonResponse({"error": "manifest missing"}, status=404)
+
+#     # --------------------------------------------------
+#     # Load manifest
+#     # --------------------------------------------------
+#     with open(manifest_path, "r", encoding="utf-8") as f:
+#         manifest = json.load(f)
+
+#     if not manifest.get("chunks"):
+#         return JsonResponse({"error": "no chunks uploaded"}, status=400)
+
+#     # --------------------------------------------------
+#     # Assemble final.bin + compute offsets
+#     # --------------------------------------------------
+#     chunks = sorted(manifest["chunks"], key=lambda c: c["index"])
+#     final_path = os.path.join(base_dir, "final.bin")
+
+#     offset = 0
+#     with open(final_path, "wb") as out:
+#         for c in chunks:
+#             chunk_file = os.path.join(
+#                 base_dir, "chunks", f"chunk_{c['index']}.bin"
+#             )
+
+#             if not os.path.exists(chunk_file):
+#                 return JsonResponse(
+#                     {"error": f"missing chunk {c['index']}"},
+#                     status=400,
+#                 )
+
+#             with open(chunk_file, "rb") as cf:
+#                 data = cf.read()
+
+#             # --------------------------------------------------
+#             # Integrity check (ciphertext)
+#             # --------------------------------------------------
+#             if hashlib.sha256(data).hexdigest() != c["ciphertext_sha256"]:
+#                 return JsonResponse(
+#                     {
+#                         "error": "chunk integrity failure",
+#                         "index": c["index"],
+#                     },
+#                     status=400,
+#                 )
+
+#             # --------------------------------------------------
+#             # Persist offset (CRITICAL FOR PREVIEW)
+#             # --------------------------------------------------
+#             c["offset"] = offset
+#             offset += len(data)
+
+#             out.write(data)
+
+#     # --------------------------------------------------
+#     # Persist updated manifest (with offsets)
+#     # --------------------------------------------------
+#     manifest["chunks"] = chunks
+#     manifest["server_hash"] = compute_manifest_server_hash(
+#         {k: v for k, v in manifest.items() if k != "server_hash"}
+#     )
+
+#     with open(manifest_path, "w", encoding="utf-8") as f:
+#         json.dump(manifest, f, indent=2)
+
+#     # --------------------------------------------------
+#     # Create / update FileRecord
+#     # --------------------------------------------------
+#     record, _ = FileRecord.objects.update_or_create(
+#         upload_id=upload_id,
+#         owner=user,
+#         defaults={
+#             "filename": manifest["filename"],
+#             "size": sum(c["ciphertext_size"] for c in chunks),
+#             "final_path": final_path,
+#             "storage_type": FileRecord.STORAGE_LOCAL,
+#             "security_mode": manifest["security_mode"],
+#             "deleted_at": None,
+#         },
+#     )
+
+#     return JsonResponse(
+#         {
+#             "status": 1,
+#             "file_id": str(record.id),
+#             "security_mode": record.security_mode,
+#         }
+#     )
+# @csrf_exempt
+# @require_http_methods(["POST"])
+# def finish_upload(request, upload_id):
+#     user = get_authenticated_user(request)
+#     if not user:
+#         return JsonResponse({"error": "auth required"}, status=401)
+
+#     user_id = str(user.id)
+#     upload_id = str(upload_id)
+#     base_dir = upload_base_dir(user_id, upload_id)
+
+#     manifest_path = os.path.join(base_dir, "manifest.json")
+#     if not os.path.exists(manifest_path):
+#         return JsonResponse({"error": "manifest missing"}, status=404)
+
+#     with open(manifest_path, "r", encoding="utf-8") as f:
+#         manifest = json.load(f)
+
+#     chunks = sorted(manifest["chunks"], key=lambda c: c["index"])
+
+#     final_path = os.path.join(base_dir, "final.bin")
+
+#     offset = 0
+#     with open(final_path, "wb") as out:
+#         for c in chunks:
+#             chunk_path = os.path.join(
+#                 base_dir, "chunks", f"chunk_{c['index']}.bin"
+#             )
+
+#             if not os.path.exists(chunk_path):
+#                 return JsonResponse(
+#                     {"error": f"missing chunk {c['index']}"},
+#                     status=400,
+#                 )
+
+#             with open(chunk_path, "rb") as cf:
+#                 data = cf.read()
+
+#             if hashlib.sha256(data).hexdigest() != c["ciphertext_sha256"]:
+#                 return JsonResponse(
+#                     {"error": "chunk integrity failure"},
+#                     status=400,
+#                 )
+
+#             # 🔐 critical metadata
+#             c["offset"] = offset
+#             offset += len(data)
+
+#             out.write(data)
+
+#     # ✅ WRITE UPDATED MANIFEST BACK TO DISK
+#     manifest["server_hash"] = compute_manifest_server_hash(
+#         {k: v for k, v in manifest.items() if k != "server_hash"}
+#     )
+
+#     with open(manifest_path, "w", encoding="utf-8") as f:
+#         json.dump(manifest, f, indent=2)
+
+#     record, _ = FileRecord.objects.update_or_create(
+#         upload_id=upload_id,
+#         owner=user,
+#         defaults={
+#             "filename": manifest["filename"],
+#             "size": offset,
+#             "final_path": final_path,
+#             "storage_type": FileRecord.STORAGE_LOCAL,
+#             "security_mode": manifest["security_mode"],
+#             "deleted_at": None,
+#         },
+#     )
+
+#     return JsonResponse({
+#         "status": 1,
+#         "file_id": str(record.id),
+#         "security_mode": record.security_mode,
+#     })
+
 
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -257,58 +404,68 @@ def finish_upload(request, upload_id):
     if not user:
         return JsonResponse({"error": "auth required"}, status=401)
 
+    upload_uuid = uuid.UUID(str(upload_id))
     user_id = str(user.id)
-    upload_id = str(upload_id)
-    base_dir = upload_base_dir(user_id, upload_id)
 
-    with open(os.path.join(base_dir, "manifest.json")) as f:
+    base_dir = upload_base_dir(user_id, str(upload_uuid))
+    manifest_path = os.path.join(base_dir, "manifest.json")
+
+    if not os.path.exists(manifest_path):
+        return JsonResponse({"error": "manifest missing"}, status=404)
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    chunks = sorted(manifest["chunks"], key=lambda x: x["index"])
+    chunks = sorted(manifest["chunks"], key=lambda c: c["index"])
+
     final_path = os.path.join(base_dir, "final.bin")
 
+    offset = 0
     with open(final_path, "wb") as out:
         for c in chunks:
-            with open(
-                os.path.join(base_dir, "chunks", f"chunk_{c['index']}.bin"),
-                "rb",
-            ) as cf:
-                shutil.copyfileobj(cf, out)
+            chunk_path = os.path.join(
+                base_dir, "chunks", f"chunk_{c['index']}.bin"
+            )
 
-    from .r2_storage import R2Storage
-    r2 = R2Storage()
-    remote_key = f"{user_id}/{upload_id}/final.bin"
+            with open(chunk_path, "rb") as cf:
+                data = cf.read()
 
-    try:
-        r2.upload_final(final_path, remote_key)
-        stored_path = remote_key
-        storage_type = FileRecord.STORAGE_R2
-    except Exception:
-        stored_path = final_path
-        storage_type = FileRecord.STORAGE_LOCAL
+            if hashlib.sha256(data).hexdigest() != c["ciphertext_sha256"]:
+                return JsonResponse(
+                    {"error": "chunk integrity failure"},
+                    status=400,
+                )
 
-    size = sum(c["ciphertext_size"] for c in chunks)
+            c["offset"] = offset
+            offset += len(data)
+            out.write(data)
 
-    record, _ = FileRecord.objects.update_or_create(
-        upload_id=upload_id,
+    manifest["server_hash"] = compute_manifest_server_hash(
+        {k: v for k, v in manifest.items() if k != "server_hash"}
+    )
+
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+    FileRecord.objects.update_or_create(
+        upload_id=upload_uuid,
         owner=user,
         defaults={
             "filename": manifest["filename"],
-            "size": size,
-            "final_path": stored_path,
-            "storage_type": storage_type,
+            "size": offset,
+            "final_path": final_path,
+            "storage_type": FileRecord.STORAGE_LOCAL,
             "security_mode": manifest["security_mode"],
             "deleted_at": None,
         },
     )
 
-    return JsonResponse(
-        {
-            "status": 1,
-            "file_id": str(record.id),
-            "security_mode": record.security_mode,
-        }
-    )
+    return JsonResponse({
+        "status": 1,
+        "upload_id": str(upload_uuid),
+    })
+
+
 
 
 # ============================================================
@@ -325,23 +482,19 @@ def list_files(request):
         deleted_at__isnull=True,
     ).order_by("-created_at")
 
-    return JsonResponse(
-        [
-            {
-                "file_id": str(f.id),
-                "filename": f.filename,
-                "size": f.size,
-                "security_mode": f.security_mode,
-                "has_thumbnail": bool(f.thumbnail_key),
-            }
-            for f in files
-        ],
-        safe=False,
-    )
-
+    return JsonResponse([
+        {
+            "file_id": str(f.id),
+            "upload_id": str(f.upload_id),
+            "filename": f.filename,
+            "size": f.size,
+            "security_mode": f.security_mode,
+        }
+        for f in files
+    ], safe=False)
 
 # ============================================================
-# DOWNLOAD
+# DOWNLOAD (ENCRYPTED ONLY)
 # ============================================================
 
 @api_view(["GET"])
@@ -354,44 +507,26 @@ def download_file(request, file_id):
         deleted_at__isnull=True,
     )
 
-    if file.storage_type == FileRecord.STORAGE_R2:
-        from .r2_storage import R2Storage
-        r2 = R2Storage()
-        stream, _ = r2.open_stream(file.final_path)
-        return FileResponse(stream, as_attachment=True, filename=file.filename)
-
-    return FileResponse(open(file.final_path, "rb"), as_attachment=True)
-
+    return FileResponse(
+        open(file.final_path, "rb"),
+        as_attachment=True,
+        filename=file.filename,
+    )
 
 # ============================================================
-# PREVIEW (STANDARD ONLY)
+# PREVIEW (DISABLED BY DESIGN)
 # ============================================================
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def preview_file(request, file_id):
-    file = get_object_or_404(
-        FileRecord,
-        id=file_id,
-        owner=request.user,
-        deleted_at__isnull=True,
+    return JsonResponse(
+        {"error": "Preview requires client-side decryption"},
+        status=403,
     )
 
-    if file.security_mode == FileRecord.SECURITY_ZERO:
-        return JsonResponse(
-            {"error": "preview disabled for zero-knowledge files"},
-            status=403,
-        )
-
-    from .r2_storage import R2Storage
-    r2 = R2Storage()
-    stream, content_type = r2.open_stream(file.final_path)
-
-    return FileResponse(stream, as_attachment=False, content_type=content_type)
-
-
 # ============================================================
-# TRASH
+# TRASH / DELETE / RESTORE / PURGE
 # ============================================================
 
 @api_view(["DELETE"])
@@ -409,7 +544,6 @@ def delete_upload(request, upload_id):
 
     return JsonResponse({"status": 1})
 
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def restore_upload(request, file_id):
@@ -425,7 +559,6 @@ def restore_upload(request, file_id):
 
     return JsonResponse({"status": 1})
 
-
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
 def purge_upload(request, file_id):
@@ -438,85 +571,13 @@ def purge_upload(request, file_id):
     _purge_file_record(record)
     return JsonResponse({"status": 1})
 
-
 # ============================================================
-# ZERO-KNOWLEDGE THUMBNAILS
+# RESET UNFINISHED UPLOADS (DEV)
 # ============================================================
-
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def upload_encrypted_thumbnail(request, upload_id):
-    user = request.user
-    upload_id = str(upload_id)
-
-    record = get_object_or_404(
-        FileRecord,
-        upload_id=upload_id,
-        owner=user,
-        deleted_at__isnull=True,
-    )
-
-    if record.security_mode != FileRecord.SECURITY_ZERO:
-        return JsonResponse(
-            {"error": "thumbnails only allowed in zero-knowledge mode"},
-            status=400,
-        )
-
-    blob = request.FILES.get("thumbnail")
-    if not blob:
-        return JsonResponse({"error": "missing thumbnail"}, status=400)
-
-    from .r2_storage import R2Storage
-    r2 = R2Storage()
-
-    thumb_key = f"{user.id}/{upload_id}/thumb.enc"
-
-    r2.client.upload_fileobj(blob, r2.bucket_name, thumb_key)
-
-    record.thumbnail_key = thumb_key
-    record.save(update_fields=["thumbnail_key"])
-
-    return JsonResponse({"status": 1})
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def fetch_encrypted_thumbnail(request, file_id):
-    file = get_object_or_404(
-        FileRecord,
-        id=file_id,
-        owner=request.user,
-        deleted_at__isnull=True,
-    )
-
-    if file.security_mode != FileRecord.SECURITY_ZERO:
-        return JsonResponse(
-            {"error": "thumbnails only for zero-knowledge files"},
-            status=403,
-        )
-
-    if not file.thumbnail_key:
-        return JsonResponse({"error": "no thumbnail"}, status=404)
-
-    from .r2_storage import R2Storage
-    r2 = R2Storage()
-    stream, _ = r2.open_stream(file.thumbnail_key)
-
-    return FileResponse(stream, as_attachment=True)
-
-
-# ---------------------------------------------------
-# reset uploads
-# ---------------------------------------------------
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def reset_uploads(request):
-    """
-    ⚠️ DEV / ADMIN ONLY
-    Clears unfinished upload directories for the current user.
-    """
     user_id = str(request.user.id)
     base = os.path.join(settings.MEDIA_ROOT, "uploads", user_id)
 
@@ -534,3 +595,131 @@ def reset_uploads(request):
         "status": "ok",
         "removed_uploads": removed,
     })
+    
+    
+# ============================================================
+# fetch manifest
+# ============================================================
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def fetch_manifest(request, file_id):
+    file = get_object_or_404(
+        FileRecord,
+        id=file_id,
+        owner=request.user,
+        deleted_at__isnull=True,
+    )
+
+    user_id = str(request.user.id)
+    upload_id = str(file.upload_id)
+
+    manifest_path = os.path.join(
+        settings.MEDIA_ROOT,
+        "uploads",
+        user_id,
+        upload_id,
+        "manifest.json",
+    )
+
+    if not os.path.exists(manifest_path):
+        return JsonResponse(
+            {"error": "manifest missing"},
+            status=404,
+        )
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    return JsonResponse(manifest, safe=False)
+
+
+
+
+    # # ============================================================
+
+    # # FETCH ENCRYPTED DATA Full File
+    # # ============================================================
+    # from django.views.decorators.http import require_GET
+
+    # @api_view(["GET"])
+    # @permission_classes([IsAuthenticated])
+    # def fetch_encrypted_data(request, file_id):
+    #     file = get_object_or_404(
+    #         FileRecord,
+    #         id=file_id,
+    #         owner=request.user,
+    #         deleted_at__isnull=True,
+    #     )
+
+    #     # 🔐 Server is blind: always encrypted
+    #     if file.storage_type == FileRecord.STORAGE_LOCAL:
+    #         if not os.path.exists(file.final_path):
+    #             return JsonResponse({"error": "file missing"}, status=404)
+
+    #         return FileResponse(
+    #             open(file.final_path, "rb"),
+    #             content_type="application/octet-stream",
+    #         )
+
+    #     # R2 / S3
+    #     from .r2_storage import R2Storage
+    #     r2 = R2Storage()
+
+    #     try:
+    #         stream, _ = r2.open_stream(file.final_path)
+    #     except Exception as e:
+    #         return JsonResponse(
+    #             {"error": f"storage error: {str(e)}"},
+    #             status=500,
+    #         )
+
+    #     return FileResponse(
+    #         stream,
+    #         content_type="application/octet-stream",
+    #     )
+# # ============================================================
+# FETCH ENCRYPTED DATA (RAW BINARY)
+from django.views.decorators.http import require_GET
+
+@require_GET
+def fetch_encrypted_data(request, file_id):
+    user = get_authenticated_user(request)
+    if not user:
+        return JsonResponse({"error": "auth required"}, status=401)
+
+    file = get_object_or_404(
+        FileRecord,
+        id=file_id,
+        owner=user,
+        deleted_at__isnull=True,
+    )
+
+    if file.storage_type == FileRecord.STORAGE_LOCAL:
+        if not os.path.exists(file.final_path):
+            return JsonResponse({"error": "file missing"}, status=404)
+
+        # 🔐 RAW BINARY — NO DRF
+        response = FileResponse(
+            open(file.final_path, "rb"),
+            as_attachment=False,
+        )
+        response["Content-Type"] = "application/octet-stream"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
+    # R2 / S3 (same logic)
+    from .r2_storage import R2Storage
+    r2 = R2Storage()
+
+    try:
+        stream, _ = r2.open_stream(file.final_path)
+    except Exception as e:
+        return JsonResponse(
+            {"error": f"storage error: {str(e)}"},
+            status=500,
+        )
+
+    response = FileResponse(stream)
+    response["Content-Type"] = "application/octet-stream"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

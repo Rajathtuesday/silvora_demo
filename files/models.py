@@ -8,9 +8,8 @@ from django.utils import timezone
 
 class FileRecord(models.Model):
     """
-    Canonical file metadata.
-    File contents are ALWAYS encrypted.
-    Server never stores plaintext.
+    Canonical encrypted file metadata.
+    Server never sees plaintext.
     """
 
     # -------------------------
@@ -48,13 +47,13 @@ class FileRecord(models.Model):
     )
 
     # -------------------------
-    # File metadata (non-sensitive)
+    # Non-sensitive metadata
     # -------------------------
     filename = models.CharField(max_length=255)
     size = models.BigIntegerField(default=0)
 
-    # Encrypted object location (path or R2 object key)
-    final_path = models.CharField(max_length=1024, blank=True, default="")
+    # Opaque encrypted object location
+    final_path = models.CharField(max_length=1024)
 
     storage_type = models.CharField(
         max_length=10,
@@ -62,68 +61,75 @@ class FileRecord(models.Model):
         default=STORAGE_LOCAL,
     )
 
-    # 🔐 Security contract (IMMUTABLE per file)
+    # 🔐 Security contract (IMMUTABLE)
     security_mode = models.CharField(
         max_length=20,
         choices=SECURITY_CHOICES,
-        default=SECURITY_STANDARD,
     )
 
-    # Encrypted thumbnail object key (opaque to server)
+    # 🔑 Which master key version encrypted this file
+    key_version = models.PositiveIntegerField(default=1)
+
+    # Encrypted thumbnail reference (opaque)
     thumbnail_key = models.CharField(max_length=512, blank=True)
 
     # -------------------------
     # Lifecycle
     # -------------------------
     created_at = models.DateTimeField(auto_now_add=True)
-
-    # Soft delete → Trash
     deleted_at = models.DateTimeField(null=True, blank=True)
 
-    # Optional legacy flag (safe to remove later)
-    is_completed = models.BooleanField(default=True)
-
-    # -------------------------
-    # Helpers
-    # -------------------------
     def __str__(self):
-        return f"{self.filename} ({self.owner})"
+        return f"{self.filename} ({self.owner_id})"
 
     @property
     def is_deleted(self) -> bool:
         return self.deleted_at is not None
 
 
-class FileChunk(models.Model):
+# ============================================================
+# MASTER KEY ENVELOPE
+# ============================================================
+
+class MasterKeyEnvelope(models.Model):
     """
-    Tracks uploaded encrypted chunks.
-    Used only for resumable uploads.
+    Stores the user's encrypted master key.
+    Server never sees plaintext or derived keys.
     """
 
-    file = models.ForeignKey(
-        FileRecord,
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    owner = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
-        related_name="chunks",
+        related_name="master_key_envelope",
     )
 
-    index = models.PositiveIntegerField()
-    size = models.PositiveIntegerField()
-    uploaded_at = models.DateTimeField(auto_now_add=True)
+    # 🔐 Password-encrypted master key
+    enc_master_key_pwd = models.BinaryField()
 
-    class Meta:
-        unique_together = ("file", "index")
-        ordering = ["index"]
+    # 🔑 Argon2id parameters
+    kdf_salt = models.BinaryField()
+    kdf_memory_kb = models.PositiveIntegerField()
+    kdf_iterations = models.PositiveIntegerField()
+    kdf_parallelism = models.PositiveIntegerField()
+
+    # 🔄 Rotation tracking
+    key_version = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+    rotated_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f"Chunk {self.index} of {self.file.upload_id}"
+        return f"MasterKeyEnvelope(user={self.owner_id}, v={self.key_version})"
 
+
+# ============================================================
+# FUTURE: SECURE SHARING
+# ============================================================
 
 class FileShare(models.Model):
     """
-    FUTURE: Secure file sharing without revealing master keys.
-
-    Stores a file key encrypted for each recipient.
-    Server never sees decrypted keys.
+    Stores per-recipient encrypted file keys.
     """
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -146,16 +152,15 @@ class FileShare(models.Model):
         related_name="shares_received",
     )
 
-    # Encrypted file key (recipient-specific)
-    encrypted_file_key = models.BinaryField(null=True, blank=True)
+    encrypted_file_key = models.BinaryField()
 
     enc_algo = models.CharField(
         max_length=64,
         default="XCHACHA20_POLY1305",
     )
 
-    key_salt_b64 = models.CharField(max_length=256, null=True, blank=True)
-    nonce_b64 = models.CharField(max_length=256, null=True, blank=True)
+    key_salt_b64 = models.CharField(max_length=256)
+    nonce_b64 = models.CharField(max_length=256)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -163,4 +168,4 @@ class FileShare(models.Model):
         unique_together = ("file", "recipient")
 
     def __str__(self):
-        return f"{self.file.filename} → {self.recipient.username}"
+        return f"{self.file.filename} → {self.recipient_id}"
