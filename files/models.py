@@ -54,6 +54,8 @@ class FileRecord(models.Model):
 
     # Opaque encrypted object location
     final_path = models.CharField(max_length=1024)
+    #encrypted manifest location(R2 key or local path )
+    manifest_path = models.CharField(max_length=1024)
 
     storage_type = models.CharField(
         max_length=10,
