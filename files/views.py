@@ -22,6 +22,9 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import FileRecord
 
+from .r2_storage import R2Storage
+
+
 # ============================================================
 # CONFIG
 # ============================================================
@@ -447,18 +450,47 @@ def finish_upload(request, upload_id):
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
+    # --------------------------------------------------
+    # FileRecord.objects.update_or_create(
+    #     upload_id=upload_uuid,
+    #     owner=user,
+    #     defaults={
+    #         "filename": manifest["filename"],
+    #         "size": offset,
+    #         "final_path": final_path,
+    #         "storage_type": FileRecord.STORAGE_LOCAL,
+    #         "security_mode": manifest["security_mode"],
+    #         "deleted_at": None,
+    #     },
+    # )
+    # --------------------------------------------------
+    # ===============================
+    # UPLOAD FINAL.BIN TO R2
+    # ===============================
+    r2 = R2Storage()
+    r2_key = f"user/{user_id}/{upload_uuid}/final.bin"
+
+    r2.upload_file(final_path, r2_key)
+
+    # 🔥 REMOVE LOCAL FILE (Render disk is ephemeral anyway)
+    os.remove(final_path)
+
+    # ===============================
+    # SAVE FILE RECORD
+    # ===============================
     FileRecord.objects.update_or_create(
         upload_id=upload_uuid,
         owner=user,
         defaults={
             "filename": manifest["filename"],
             "size": offset,
-            "final_path": final_path,
-            "storage_type": FileRecord.STORAGE_LOCAL,
+            "storage_type": FileRecord.STORAGE_R2,
+            "storage_key": r2_key,
             "security_mode": manifest["security_mode"],
             "deleted_at": None,
         },
     )
+
 
     return JsonResponse({
         "status": 1,
@@ -497,6 +529,24 @@ def list_files(request):
 # DOWNLOAD (ENCRYPTED ONLY)
 # ============================================================
 
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def download_file(request, file_id):
+#     file = get_object_or_404(
+#         FileRecord,
+#         id=file_id,
+#         owner=request.user,
+#         deleted_at__isnull=True,
+#     )
+
+#     return FileResponse(
+#         open(file.final_path, "rb"),
+#         as_attachment=True,
+#         filename=file.filename,
+#     )
+
+from .r2_storage import R2Storage
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def download_file(request, file_id):
@@ -507,11 +557,24 @@ def download_file(request, file_id):
         deleted_at__isnull=True,
     )
 
+    if file.storage_type == FileRecord.STORAGE_LOCAL:
+        return FileResponse(
+            open(file.final_path, "rb"),
+            as_attachment=True,
+            filename=file.filename,
+        )
+
+    # 🔐 R2 (encrypted only)
+    r2 = R2Storage()
+    stream, _ = r2.open_stream(file.storage_key)
+
     return FileResponse(
-        open(file.final_path, "rb"),
+        stream,
         as_attachment=True,
         filename=file.filename,
+        content_type="application/octet-stream",
     )
+
 
 # ============================================================
 # PREVIEW (DISABLED BY DESIGN)
