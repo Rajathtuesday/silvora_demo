@@ -219,7 +219,62 @@
 #     def __str__(self):
 #         return f"MasterKey(user={self.user_id}, version={self.version})"
 # ===--------------------------------------------------------------------------===
-# users/models.py
+# # users/models.py
+# from django.conf import settings
+# from django.db import models
+
+
+# class MasterKey(models.Model):
+#     """
+#     Per-user master key record.
+
+#     We NEVER store the plaintext master key, only an AEAD-encrypted blob
+#     plus KDF parameters so the client can derive the same KEK from the password.
+#     """
+
+#     user = models.OneToOneField(
+#         settings.AUTH_USER_MODEL,
+#         on_delete=models.CASCADE,
+#         related_name="master_key",
+#     )
+
+#     # Hex-encoded ciphertext of the 32-byte master key (encrypted with KEK)
+#     encrypted_master_key_hex = models.TextField(null=True, blank=True)
+
+#     # Base64 salt for PBKDF2 / Argon2 on the client
+#     kdf_salt_b64 = models.CharField(max_length=255, null=True, blank=True)
+
+#     # How the client derived the KEK (Key Encryption Key)
+#     kdf_algorithm = models.CharField(
+#         max_length=32,
+#         default="pbkdf2-hmac-sha256",
+#     )
+#     kdf_iterations = models.IntegerField(default=150_000)
+
+#     # AEAD algorithm metadata (for future migration)
+#     aead_algorithm = models.CharField(
+#         max_length=32,
+#         default="xchacha20-poly1305",
+#     )
+#     nonce_b64 = models.CharField(max_length=255, null=True, blank=True)
+
+#     # Versioning for future rotations / format changes
+#     version = models.IntegerField(default=1)
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     # Reserved for future recovery mechanism – leave NULL for now
+#     recovery_blob = models.TextField(
+#         null=True,
+#         blank=True,
+#         help_text="Reserved for future encrypted recovery bundle.",
+#     )
+
+#     def __str__(self):
+#         return f"MasterKey(user={self.user_id}, version={self.version})"
+# ===========================================================================
+# # users/models.py
 from django.conf import settings
 from django.db import models
 
@@ -228,8 +283,8 @@ class MasterKey(models.Model):
     """
     Per-user master key record.
 
-    We NEVER store the plaintext master key, only an AEAD-encrypted blob
-    plus KDF parameters so the client can derive the same KEK from the password.
+    Server NEVER sees plaintext master key.
+    Client uploads encrypted master key after login.
     """
 
     user = models.OneToOneField(
@@ -238,38 +293,32 @@ class MasterKey(models.Model):
         related_name="master_key",
     )
 
-    # Hex-encoded ciphertext of the 32-byte master key (encrypted with KEK)
-    encrypted_master_key_hex = models.TextField()
+    # Encrypted master key (client-side encrypted)
+    encrypted_master_key_hex = models.TextField(null=True, blank=True)
 
-    # Base64 salt for PBKDF2 / Argon2 on the client
-    kdf_salt_b64 = models.CharField(max_length=255)
-
-    # How the client derived the KEK (Key Encryption Key)
+    # KDF metadata
+    kdf_salt_b64 = models.CharField(max_length=255, null=True, blank=True)
     kdf_algorithm = models.CharField(
         max_length=32,
         default="pbkdf2-hmac-sha256",
     )
     kdf_iterations = models.IntegerField(default=150_000)
 
-    # AEAD algorithm metadata (for future migration)
+    # AEAD metadata
     aead_algorithm = models.CharField(
         max_length=32,
         default="xchacha20-poly1305",
     )
-    nonce_b64 = models.CharField(max_length=255)
+    nonce_b64 = models.CharField(max_length=255, null=True, blank=True)
 
-    # Versioning for future rotations / format changes
+    # Versioning
     version = models.IntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # Reserved for future recovery mechanism – leave NULL for now
-    recovery_blob = models.TextField(
-        null=True,
-        blank=True,
-        help_text="Reserved for future encrypted recovery bundle.",
-    )
+    # Reserved for future recovery
+    recovery_blob = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"MasterKey(user={self.user_id}, version={self.version})"

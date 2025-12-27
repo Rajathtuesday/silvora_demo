@@ -227,30 +227,144 @@
 # ===---------------------------------------------------------------===
 
 
+# # users/views_masterkey.py
+# from rest_framework.decorators import api_view, permission_classes
+# from rest_framework.permissions import IsAuthenticated
+# from rest_framework.response import Response
+# from rest_framework import status
+
+# from .models import MasterKey
+# from .serializers import MasterKeyMetaSerializer, MasterKeySetupSerializer
+
+
+# @api_view(["GET"])
+# @permission_classes([IsAuthenticated])
+# def get_master_key_meta(request):
+#     """
+#     GET /api/auth/masterkey/meta/
+
+#     Used right after login:
+#     - tells client if a master key exists
+#     - returns only metadata (no key / no ciphertext)
+#     """
+#     try:
+#         mk = MasterKey.objects.get(user=request.user)
+#     except MasterKey.DoesNotExist:
+#         # No master key yet
+#         return Response(
+#             {
+#                 "has_master_key": False,
+#                 "kdf_algorithm": None,
+#                 "kdf_iterations": None,
+#                 "aead_algorithm": None,
+#                 "version": None,
+#             },
+#             status=status.HTTP_200_OK,
+#         )
+
+#     serializer = MasterKeyMetaSerializer(mk)
+#     data = serializer.data
+#     # ensure flag present even if serializer changes later
+#     data["has_master_key"] = True
+#     return Response(data, status=status.HTTP_200_OK)
+
+
+# @api_view(["POST"])
+# @permission_classes([IsAuthenticated])
+# def setup_master_key(request):
+#     """
+#     POST /api/auth/masterkey/setup/
+
+#     Body JSON:
+#     {
+#       "encrypted_master_key_hex": "...",
+#       "kdf_salt_b64": "...",
+#       "kdf_algorithm": "pbkdf2-hmac-sha256",
+#       "kdf_iterations": 150000,
+#       "aead_algorithm": "xchacha20-poly1305",
+#       "nonce_b64": "..."
+#     }
+
+#     Client already:
+#       - generated random master key
+#       - derived KEK from password with KDF
+#       - encrypted master key with AEAD (XChaCha20-Poly1305)
+#     """
+#     try:
+#         mk = MasterKey.objects.get(user=request.user)
+#         # Update existing
+#         serializer = MasterKeySetupSerializer(
+#             mk, data=request.data, context={"request": request}
+#         )
+#     except MasterKey.DoesNotExist:
+#         # Create new
+#         serializer = MasterKeySetupSerializer(
+#             data=request.data, context={"request": request}
+#         )
+
+#     serializer.is_valid(raise_exception=True)
+#     mk_obj = serializer.save()
+
+#     return Response(
+#         {
+#             "status": 1,
+#             "message": "master key stored",
+#             "version": mk_obj.version,
+#         },
+#         status=status.HTTP_200_OK,
+#     )
+# ============================================================
+
+# # users/views.py
+# from rest_framework.views import APIView
+# from rest_framework.response import Response
+# from rest_framework import status, permissions
+
+# from .serializers import RegisterSerializer
+
+
+# class RegisterView(APIView):
+#     permission_classes = [permissions.AllowAny]
+
+#     def post(self, request):
+#         serializer = RegisterSerializer(data=request.data)
+#         serializer.is_valid(raise_exception=True)
+#         user = serializer.save()
+
+#         return Response(
+#             {
+#                 "id": user.id,
+#                 "username": user.username,
+#                 "email": user.email,
+#                 "status": "registered",
+#             },
+#             status=status.HTTP_201_CREATED,
+#         )
+# ============================================================
+
 # users/views_masterkey.py
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 
 from .models import MasterKey
-from .serializers import MasterKeyMetaSerializer, MasterKeySetupSerializer
+from .serializers import (
+    MasterKeyMetaSerializer,
+    MasterKeySetupSerializer,
+)
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_master_key_meta(request):
     """
-    GET /api/auth/masterkey/meta/
-
-    Used right after login:
-    - tells client if a master key exists
-    - returns only metadata (no key / no ciphertext)
+    GET /api/auth/master-key/meta/
     """
     try:
         mk = MasterKey.objects.get(user=request.user)
     except MasterKey.DoesNotExist:
-        # No master key yet
         return Response(
             {
                 "has_master_key": False,
@@ -264,8 +378,8 @@ def get_master_key_meta(request):
 
     serializer = MasterKeyMetaSerializer(mk)
     data = serializer.data
-    # ensure flag present even if serializer changes later
-    data["has_master_key"] = True
+    data["has_master_key"] = bool(mk.encrypted_master_key_hex)
+
     return Response(data, status=status.HTTP_200_OK)
 
 
@@ -273,43 +387,30 @@ def get_master_key_meta(request):
 @permission_classes([IsAuthenticated])
 def setup_master_key(request):
     """
-    POST /api/auth/masterkey/setup/
-
-    Body JSON:
-    {
-      "encrypted_master_key_hex": "...",
-      "kdf_salt_b64": "...",
-      "kdf_algorithm": "pbkdf2-hmac-sha256",
-      "kdf_iterations": 150000,
-      "aead_algorithm": "xchacha20-poly1305",
-      "nonce_b64": "..."
-    }
-
-    Client already:
-      - generated random master key
-      - derived KEK from password with KDF
-      - encrypted master key with AEAD (XChaCha20-Poly1305)
+    POST /api/auth/master-key/setup/
     """
     try:
         mk = MasterKey.objects.get(user=request.user)
-        # Update existing
-        serializer = MasterKeySetupSerializer(
-            mk, data=request.data, context={"request": request}
-        )
     except MasterKey.DoesNotExist:
-        # Create new
-        serializer = MasterKeySetupSerializer(
-            data=request.data, context={"request": request}
+        return Response(
+            {"error": "MasterKey record missing"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
 
+    serializer = MasterKeySetupSerializer(
+        mk,
+        data=request.data,
+        context={"request": request},
+    )
     serializer.is_valid(raise_exception=True)
-    mk_obj = serializer.save()
+    mk = serializer.save()
 
     return Response(
         {
             "status": 1,
             "message": "master key stored",
-            "version": mk_obj.version,
+            "version": mk.version,
         },
         status=status.HTTP_200_OK,
     )
+# ============================================================
