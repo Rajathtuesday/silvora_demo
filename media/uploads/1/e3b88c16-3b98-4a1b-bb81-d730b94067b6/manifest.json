@@ -1,0 +1,29 @@
+{
+  "manifest_version": 1,
+  "filename": "20251223_092333.jpg",
+  "file_size": 2852246,
+  "chunk_size": 2097152,
+  "owner": "1",
+  "security_mode": "standard",
+  "encryption": "client_side",
+  "aead_algorithm": "XCHACHA20_POLY1305",
+  "chunks": [
+    {
+      "index": 0,
+      "ciphertext_size": 2097152,
+      "ciphertext_sha256": "96e5fc5be832bb20eaa94fd04337e3603d761212fb9ebed5a006cb17b31ff1a8",
+      "nonce_b64": "2zM63+mkZAV0rupSkA9+2W5T2NRHuY7p",
+      "mac_b64": "iq0r2wNuu3EySH6M4f6jXw==",
+      "offset": 0
+    },
+    {
+      "index": 1,
+      "ciphertext_size": 755094,
+      "ciphertext_sha256": "77a832db7b4335e22f39452d6b744e203aadfa7f652ec804a40f760f9727524e",
+      "nonce_b64": "B5b+lv7rvkP8rXXzlMUkLWEtdajVwK+x",
+      "mac_b64": "hgZR7IvP87C3QNxCC+FKug==",
+      "offset": 2097152
+    }
+  ],
+  "server_hash": "5d6ca9fd45ebda3d71421a07bcd249fe3d2203fa09ead601e94a74f3da01be66"
+}

@@ -1,0 +1,21 @@
+{
+  "manifest_version": 1,
+  "filename": "20230429_160318.jpg",
+  "file_size": 180992,
+  "chunk_size": 2097152,
+  "owner": "3",
+  "security_mode": "standard",
+  "encryption": "client_side",
+  "aead_algorithm": "XCHACHA20_POLY1305",
+  "chunks": [
+    {
+      "index": 0,
+      "ciphertext_size": 180992,
+      "ciphertext_sha256": "6a1eff0fc98f5cf86f0a4018a04d420b813205410bb2f364fd943bebacbf9baa",
+      "nonce_b64": "cA9fWkf5j6nZFIOP1gmb/TaTMYQqVF0y",
+      "mac_b64": "Ltif/ohFUbajy9irFblirA==",
+      "offset": 0
+    }
+  ],
+  "server_hash": "74db4429d34f1e0f78cf8058ef2da204cafe6f3abb6fc8cfdc79f4863761bb2c"
+}
