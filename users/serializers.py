@@ -226,18 +226,21 @@ class RegisterSerializer(serializers.ModelSerializer):
         email = value.strip().lower()
         if User.objects.filter(email=email).exists():
             raise serializers.ValidationError("Email already registered")
-        return email
+        return email.lower()
 
     def validate_password(self, value):
-        if len(value) < 8:
-            raise serializers.ValidationError("Password must be at least 8 characters")
-        if not any(c.islower() for c in value):
-            raise serializers.ValidationError("Password must include a lowercase letter")
-        if not any(c.isupper() for c in value):
-            raise serializers.ValidationError("Password must include an uppercase letter")
-        if not any(c.isdigit() for c in value):
-            raise serializers.ValidationError("Password must include a number")
+        from django.contrib.auth.password_validation import validate_password
+        validate_password(value)
         return value
+        # if len(value) < 8:
+        #     raise serializers.ValidationError("Password must be at least 8 characters")
+        # if not any(c.islower() for c in value):
+        #     raise serializers.ValidationError("Password must include a lowercase letter")
+        # if not any(c.isupper() for c in value):
+        #     raise serializers.ValidationError("Password must include an uppercase letter")
+        # if not any(c.isdigit() for c in value):
+        #     raise serializers.ValidationError("Password must include a number")
+        # return value
 
     def create(self, validated_data):
         email = validated_data["email"]
