@@ -40,6 +40,7 @@ urlpatterns = [
         
     # Healthcheck endpoint
     path('healthz/', healthcheck, name='healthcheck'),
+    #
     
 ]
 

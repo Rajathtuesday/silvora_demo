@@ -260,6 +260,7 @@
 import os
 from datetime import timedelta
 from pathlib import Path
+
 import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -269,14 +270,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # =====================================================
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-key-do-not-use")
-DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
-
+# DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
+DEBUG = "True"
 
 ALLOWED_HOSTS = [
     "*",
     "app.silvora.cloud",
     "silvora.cloud",
     "silvora-demo.onrender.com",
+    '10.69.186.236',
 ]
 
 CSRF_TRUSTED_ORIGINS = [
@@ -420,6 +422,13 @@ R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
+
+#for temp testing
+
+
+
+
+
 
 # S3-compatible endpoint
 R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"

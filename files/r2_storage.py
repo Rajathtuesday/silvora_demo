@@ -76,6 +76,60 @@
 
 
 
+# import boto3
+# from django.conf import settings
+
+# class R2Storage:
+#     def __init__(self):
+#         self.client = boto3.client(
+#             "s3",
+#             endpoint_url=settings.R2_ENDPOINT,
+#             aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+#             aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+#             region_name="auto",
+#         )
+#         self.bucket = settings.R2_BUCKET_NAME
+
+#     def upload_file(self, local_path: str, key: str):
+#         with open(local_path, "rb") as f:
+#             self.client.upload_fileobj(
+#                 f,
+#                 self.bucket,
+#                 key,
+#                 ExtraArgs={"ContentType": "application/octet-stream"},
+#             )
+
+#     def open_stream(self, key: str):
+#         obj = self.client.get_object(Bucket=self.bucket, Key=key)
+#         return obj["Body"], obj["ContentLength"]
+# import boto3
+# from django.conf import settings
+
+# class R2Storage:
+#     def __init__(self):
+#         self.client = boto3.client(
+#             "s3",
+#             endpoint_url=settings.R2_ENDPOINT,
+#             aws_access_key_id=settings.R2_ACCESS_KEY_ID,
+#             aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
+#             region_name="auto",
+#         )
+#         self.bucket = settings.R2_BUCKET_NAME
+
+#     def upload_file(self, local_path: str, key: str):
+#         with open(local_path, "rb") as f:
+#             self.client.upload_fileobj(
+#                 f,
+#                 self.bucket,
+#                 key,
+#                 ExtraArgs={"ContentType": "application/octet-stream"},
+#             )
+
+#     def open_stream(self, key: str):
+#         obj = self.client.get_object(Bucket=self.bucket, Key=key)
+#         return obj["Body"], obj["ContentLength"]
+# ================================================================================
+# files/r2_storage.py
 import boto3
 from django.conf import settings
 
@@ -90,41 +144,31 @@ class R2Storage:
         )
         self.bucket = settings.R2_BUCKET_NAME
 
-    def upload_file(self, local_path: str, key: str):
-        with open(local_path, "rb") as f:
-            self.client.upload_fileobj(
-                f,
-                self.bucket,
-                key,
-                ExtraArgs={"ContentType": "application/octet-stream"},
-            )
-
-    def open_stream(self, key: str):
-        obj = self.client.get_object(Bucket=self.bucket, Key=key)
-        return obj["Body"], obj["ContentLength"]
-import boto3
-from django.conf import settings
-
-class R2Storage:
-    def __init__(self):
-        self.client = boto3.client(
-            "s3",
-            endpoint_url=settings.R2_ENDPOINT,
-            aws_access_key_id=settings.R2_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.R2_SECRET_ACCESS_KEY,
-            region_name="auto",
+    def upload_bytes(self, data: bytes, key: str):
+        self.client.put_object(
+            Bucket=self.bucket,
+            Key=key,
+            Body=data,
+            ContentType="application/octet-stream",
         )
-        self.bucket = settings.R2_BUCKET_NAME
 
-    def upload_file(self, local_path: str, key: str):
-        with open(local_path, "rb") as f:
-            self.client.upload_fileobj(
-                f,
-                self.bucket,
-                key,
-                ExtraArgs={"ContentType": "application/octet-stream"},
-            )
+    def upload_json(self, obj: dict, key: str):
+        import json
+        self.client.put_object(
+            Bucket=self.bucket,
+            Key=key,
+            Body=json.dumps(obj, separators=(",", ":")).encode(),
+            ContentType="application/json",
+        )
+
+    def get_json(self, key: str) -> dict:
+        import json
+        obj = self.client.get_object(Bucket=self.bucket, Key=key)
+        return json.loads(obj["Body"].read())
 
     def open_stream(self, key: str):
         obj = self.client.get_object(Bucket=self.bucket, Key=key)
         return obj["Body"], obj["ContentLength"]
+
+    def delete_object(self, key: str):
+        self.client.delete_object(Bucket=self.bucket, Key=key)  

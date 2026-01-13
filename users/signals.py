@@ -34,3 +34,16 @@ def create_master_key_record(sender, instance, created, **kwargs):
     """
     if created:
         MasterKey.objects.create(user=instance)
+        
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.conf import settings
+
+from files.models import UserQuota
+
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_user_quota(sender, instance, created, **kwargs):
+    
+    if created:
+        UserQuota.objects.create(user=instance)
+        
