@@ -270,8 +270,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # =====================================================
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-key-do-not-use")
-# DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
-DEBUG = "True"
+DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
+# DEBUG = "True"
 
 ALLOWED_HOSTS = [
     "*",
@@ -306,6 +306,7 @@ INSTALLED_APPS = [
 
     "files",
     "users",
+    "django_extensions",
 ]
 
 # =====================================================
@@ -335,9 +336,11 @@ DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR/'db.sqlite3'}",
         conn_max_age=600,
-        ssl_require=False,
+        ssl_require=not DEBUG,
     )
 }
+
+
 
 # =====================================================
 # 📁 STATIC & MEDIA — IMPORTANT FOR RENDER
@@ -427,7 +430,11 @@ R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 
 
 
+# R2_ACCOUNT_ID = "836c606fc06525ba405b92c49ff23845"
 
+# R2_BUCKET_NAME = "silvora-files"
+# R2_ACCESS_KEY_ID = "a05832aceed087b95c49f91c8ab042e8"
+# R2_SECRET_ACCESS_KEY = "bc6447f86075b4c7e48b2fe391a57daa58ea2d18ee91182dc51a441a9fbdae08"
 
 
 # S3-compatible endpoint
