@@ -270,8 +270,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # =====================================================
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-key-do-not-use")
-DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
-# DEBUG = "True"
+# DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
+DEBUG = "True"
 
 ALLOWED_HOSTS = [
     "*",
@@ -305,10 +305,14 @@ INSTALLED_APPS = [
     "corsheaders",
 
     "files",
-    "users",
+    
     "django_extensions",
+    
+    "tenants.apps.TenantsConfig",  # ensure signals are loaded
+    "users.apps.UsersConfig",      # ensure signals are loaded
 ]
 
+AUTH_USER_MODEL = "users.User"
 # =====================================================
 # 🧱 MIDDLEWARE
 # =====================================================
@@ -332,14 +336,24 @@ WSGI_APPLICATION = "project_name.wsgi.application"
 # 🛢 DATABASE (Render: SQLite or Postgres)
 # =====================================================
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR/'db.sqlite3'}",
-        conn_max_age=300,
-        ssl_require=not DEBUG,
-    )
-}
+import dj_database_url
 
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.parse(
+            os.environ.get("DATABASE_URL"),
+            conn_max_age=600,
+            ssl_require=True,
+        )
+    }
+else:
+    # Local development → SQLite (no SSL nonsense)
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # =====================================================
@@ -428,13 +442,8 @@ R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 
 #for temp testing
 
+# R2_token_val="2buFk7rzHkDRLQG55OdWHKoCXnlZAdzrvV4SjftY"
 
-
-# R2_ACCOUNT_ID = "836c606fc06525ba405b92c49ff23845"
-
-# R2_BUCKET_NAME = "silvora-files"
-# R2_ACCESS_KEY_ID = "a05832aceed087b95c49f91c8ab042e8"
-# R2_SECRET_ACCESS_KEY = "bc6447f86075b4c7e48b2fe391a57daa58ea2d18ee91182dc51a441a9fbdae08"
 
 
 # S3-compatible endpoint
