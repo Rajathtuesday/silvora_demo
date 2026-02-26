@@ -1,48 +1,3 @@
-# # files/services/storage_gateway.py
-
-# from typing import Tuple
-# from ..r2_storage import R2Storage
-
-
-# class StorageGateway:
-#     """
-#     Abstraction layer over storage backend.
-#     Currently R2 only.
-#     """
-
-#     def __init__(self):
-#         self.backend = R2Storage()
-
-#     # ---------- Manifest ----------
-
-#     def upload_manifest(self, manifest: dict, key: str):
-#         self.backend.upload_json(manifest, key)
-
-#     def get_manifest(self, key: str) -> dict:
-#         return self.backend.get_json(key)
-
-#     # ---------- Chunks ----------
-
-#     def upload_chunk(self, data: bytes, key: str):
-#         self.backend.upload_bytes(data, key)
-
-#     def get_chunk(self, key: str) -> bytes:
-#         obj = self.backend.client.get_object(
-#             Bucket=self.backend.bucket,
-#             Key=key,
-#         )
-#         return obj["Body"].read()
-
-#     # ---------- Final File ----------
-
-#     def upload_final(self, data: bytes, key: str):
-#         self.backend.upload_bytes(data, key)
-
-#     def open_final_stream(self, key: str) -> Tuple[object, int]:
-#         return self.backend.open_stream(key)
-
-
-
 # files/services/storage_gateway.py
 
 import boto3
@@ -61,15 +16,7 @@ class StorageGateway:
         )
         self.bucket = settings.R2_BUCKET_NAME
 
-    def upload_chunk(self, data: bytes, key: str):
-        self.client.put_object(
-            Bucket=self.bucket,
-            Key=key,
-            Body=data,
-            ContentType="application/octet-stream",
-        )
-
-    def upload_manifest_blob(self, data: bytes, key: str):
+    def upload_bytes(self, data: bytes, key: str):
         self.client.put_object(
             Bucket=self.bucket,
             Key=key,

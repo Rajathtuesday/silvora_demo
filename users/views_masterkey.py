@@ -342,75 +342,60 @@
 #         )
 # ============================================================
 
-# users/views_masterkey.py
-
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
+from django.shortcuts import get_object_or_404
 
-from .models import MasterKey
+from .models import MasterKeyEnvelope
 from .serializers import (
     MasterKeyMetaSerializer,
     MasterKeySetupSerializer,
 )
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def get_master_key_meta(request):
-    """
-    GET /api/auth/master-key/meta/
-    """
-    try:
-        mk = MasterKey.objects.get(user=request.user)
-    except MasterKey.DoesNotExist:
-        return Response(
-            {
-                "has_master_key": False,
-                "kdf_algorithm": None,
-                "kdf_iterations": None,
-                "aead_algorithm": None,
-                "version": None,
-            },
-            status=status.HTTP_200_OK,
+# ==========================================
+# GET MASTER KEY META
+# ==========================================
+
+class GetMasterKeyMetaView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+
+        envelope = get_object_or_404(
+            MasterKeyEnvelope,
+            user=request.user,
         )
 
-    serializer = MasterKeyMetaSerializer(mk)
-    data = serializer.data
-    data["has_master_key"] = bool(mk.encrypted_master_key_hex)
-
-    return Response(data, status=status.HTTP_200_OK)
+        serializer = MasterKeyMetaSerializer(envelope)
+        return Response(serializer.data)
 
 
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def setup_master_key(request):
-    """
-    POST /api/auth/master-key/setup/
-    """
-    try:
-        mk = MasterKey.objects.get(user=request.user)
-    except MasterKey.DoesNotExist:
-        return Response(
-            {"error": "MasterKey record missing"},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+# ==========================================
+# SETUP MASTER KEY
+# ==========================================
+
+class SetupMasterKeyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+
+        if MasterKeyEnvelope.objects.filter(user=request.user).exists():
+            return Response(
+                {"error": "Master key already exists"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = MasterKeySetupSerializer(
+            data=request.data,
+            context={"request": request},
         )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
 
-    serializer = MasterKeySetupSerializer(
-        mk,
-        data=request.data,
-        context={"request": request},
-    )
-    serializer.is_valid(raise_exception=True)
-    mk = serializer.save()
-
-    return Response(
-        {
-            "status": 1,
-            "message": "master key stored",
-            "version": mk.version,
-        },
-        status=status.HTTP_200_OK,
-    )
-# ============================================================
+        return Response(
+            {"status": "master_key_created"},
+            status=status.HTTP_201_CREATED,
+        )
