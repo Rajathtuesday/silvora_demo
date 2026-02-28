@@ -10,18 +10,13 @@ from ..models import FileRecord
 from .storage_gateway import StorageGateway
 from .quota_service import QuotaService
 
+import hashlib
+import json
 
-# ============================================================
-# R2 BASE PATH BUILDER
-# ============================================================
 
 def r2_base(tenant_id, user_id, file_id):
     return f"Silvora/tenants/{tenant_id}/users/{user_id}/files/{file_id}"
 
-
-# ============================================================
-# UPLOAD SERVICE (ZERO KNOWLEDGE SAFE)
-# ============================================================
 
 class UploadService:
 
@@ -35,27 +30,15 @@ class UploadService:
 
     def start(self, data):
 
-        # 🔐 Encrypted filename inputs
-        filename_cipher = data.get("filename_ciphertext")
-        filename_nonce = data.get("filename_nonce")
-        filename_mac = data.get("filename_mac")
-
         total_size = int(data.get("size", 0))
         security_mode = data.get("security_mode")
 
-        if (
-            not filename_cipher
-            or not filename_nonce
-            or not filename_mac
-            or total_size <= 0
-        ):
-            return {"error": "Invalid input"}, 400
+        if total_size <= 0:
+            return {"error": "Invalid file size"}, 400
 
-        # Validate tenant binding
         if not self.user.tenant:
             return {"error": "User not assigned to tenant"}, 400
 
-        # Ensure quotas exist
         user_quota = QuotaService.get_or_create_user_quota(self.user)
         QuotaService.get_or_create_tenant_quota(self.user.tenant)
 
@@ -64,13 +47,9 @@ class UploadService:
 
         expires_at = timezone.now() + timedelta(hours=24)
 
-        # Create file record (server-blind)
         file = FileRecord.objects.create(
             owner=self.user,
             tenant=self.user.tenant,
-            filename_ciphertext=bytes.fromhex(filename_cipher),
-            filename_nonce=bytes.fromhex(filename_nonce),
-            filename_mac=bytes.fromhex(filename_mac),
             security_mode=security_mode,
             upload_state=FileRecord.UploadState.INITIATED,
             upload_expires_at=expires_at,
@@ -83,7 +62,7 @@ class UploadService:
         }, 200
 
     # ========================================================
-    # RESUME UPLOAD
+    # RESUME
     # ========================================================
 
     def resume(self, file_id):
@@ -95,12 +74,7 @@ class UploadService:
             tenant=self.user.tenant,
         )
 
-        base = r2_base(
-            file.tenant_id,
-            file.owner_id,
-            file.id,
-        )
-
+        base = r2_base(file.tenant_id, file.owner_id, file.id)
         chunk_indices = self.storage.list_chunks(base)
 
         return {
@@ -114,6 +88,9 @@ class UploadService:
     # ========================================================
 
     def upload_chunk(self, file_id, index, data):
+
+        if data is None or len(data) == 0:
+            return {"error": "Empty chunk"}, 400
 
         file = get_object_or_404(
             FileRecord,
@@ -134,11 +111,7 @@ class UploadService:
         ]:
             return {"error": "Invalid upload state"}, 400
 
-        base = r2_base(
-            file.tenant_id,
-            file.owner_id,
-            file.id,
-        )
+        base = r2_base(file.tenant_id, file.owner_id, file.id)
 
         self.storage.upload_bytes(
             data,
@@ -152,7 +125,7 @@ class UploadService:
         return {"stored": True}, 200
 
     # ========================================================
-    # COMMIT UPLOAD
+    # COMMIT (HARDENED)
     # ========================================================
 
     @transaction.atomic
@@ -165,28 +138,76 @@ class UploadService:
             tenant=self.user.tenant,
         )
 
+        # Idempotency
         if file.upload_state == FileRecord.UploadState.COMMITTED:
             return {"status": "already_committed"}, 200
 
+        # Expiry
         if file.upload_expires_at and timezone.now() > file.upload_expires_at:
             file.upload_state = FileRecord.UploadState.FAILED
             file.save(update_fields=["upload_state"])
             return {"error": "Upload expired"}, 400
 
-        if file.upload_state not in [
-            FileRecord.UploadState.UPLOADING,
-            FileRecord.UploadState.COMPLETED,
-        ]:
+        # State validation
+        if file.upload_state != FileRecord.UploadState.UPLOADING:
             return {"error": "Invalid state for commit"}, 400
 
-        base = r2_base(
-            file.tenant_id,
-            file.owner_id,
-            file.id,
-        )
+        # 🔐 CRITICAL: Require metadata
+        if not file.filename_ciphertext or not file.filename_nonce or not file.filename_mac:
+            return {"error": "Filename metadata missing"}, 400
 
-        total_size = self.storage.calculate_total_chunk_size(base)
+        base = r2_base(file.tenant_id, file.owner_id, file.id)
 
+        chunk_objects = self.storage.list_chunk_objects(base)
+
+        if not chunk_objects:
+            return {"error": "No chunks uploaded"}, 400
+
+        manifest_chunks = []
+        offset = 0
+        total_size = 0
+
+        for index, key, size in chunk_objects:
+
+            data = self.storage.download_bytes(key)
+
+            if data is None or len(data) == 0:
+                return {"error": f"Corrupted chunk {index}"}, 400
+
+            sha256_hex = hashlib.sha256(data).hexdigest()
+
+            manifest_chunks.append({
+                "i": index,
+                "o": offset,
+                "s": size,
+                "sha256": sha256_hex,
+            })
+
+            offset += size
+            total_size += size
+
+        if total_size <= 0:
+            return {"error": "Invalid total size"}, 400
+
+        manifest = {
+            "v": 1,
+            "key_version": file.key_version,
+            "total_chunks": len(manifest_chunks),
+            "size": total_size,
+            "chunks": manifest_chunks,
+        }
+
+        manifest_bytes = json.dumps(
+            manifest,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode()
+
+        manifest_key = f"{base}/manifest.json"
+
+        self.storage.upload_bytes(manifest_bytes, manifest_key)
+
+        # Quota consume AFTER manifest built
         success = QuotaService.consume(self.user, total_size)
 
         if not success:
@@ -195,6 +216,13 @@ class UploadService:
         file.size = total_size
         file.upload_state = FileRecord.UploadState.COMMITTED
         file.final_path = base
-        file.save(update_fields=["size", "upload_state", "final_path"])
+        file.manifest_path = manifest_key
+
+        file.save(update_fields=[
+            "size",
+            "upload_state",
+            "final_path",
+            "manifest_path",
+        ])
 
         return {"status": "committed"}, 200

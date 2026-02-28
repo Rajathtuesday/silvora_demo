@@ -18,4 +18,12 @@ urlpatterns = [
     path("file/<uuid:file_id>/delete/", views.delete_file),
     path("trash/", views.list_trash),
     path("file/<uuid:file_id>/restore/", views.restore_file),
+    
+    # #download
+    path("file/<uuid:file_id>/download/", views.download_file),
+    # #metadata
+    path("file/<uuid:file_id>/metadata/", views.set_filename_metadata),
+    # Download endpoints
+    path("download/file/<uuid:file_id>/manifest/", views.download_manifest),
+    path("download/file/<uuid:file_id>/chunk/<int:index>/", views.download_chunk),
 ]

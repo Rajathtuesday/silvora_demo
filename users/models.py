@@ -30,6 +30,7 @@ class MasterKeyEnvelope(models.Model):
     )
 
     enc_master_key = models.BinaryField()
+    enc_master_key_nonce = models.BinaryField()
 
     kdf_salt = models.BinaryField()
     kdf_memory_kb = models.PositiveIntegerField()

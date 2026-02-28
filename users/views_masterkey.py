@@ -341,7 +341,7 @@
 #             status=status.HTTP_201_CREATED,
 #         )
 # ============================================================
-
+# users/views_masterkey.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -370,6 +370,10 @@ class GetMasterKeyMetaView(APIView):
         )
 
         serializer = MasterKeyMetaSerializer(envelope)
+        print("DB ENC KEY:", envelope.enc_master_key)
+        print("DB NONCE:", envelope.enc_master_key_nonce)
+        print("DB SALT:", envelope.kdf_salt)
+        print("LEN NONCE:", len(envelope.enc_master_key_nonce))
         return Response(serializer.data)
 
 
@@ -392,6 +396,7 @@ class SetupMasterKeyView(APIView):
             data=request.data,
             context={"request": request},
         )
+        print(request.data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
