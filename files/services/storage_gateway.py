@@ -80,3 +80,37 @@ class StorageGateway:
                 total += obj["Size"]
 
         return total
+    
+    import hashlib
+
+    def download_bytes(self, key: str) -> bytes:
+        response = self.client.get_object(
+            Bucket=self.bucket,
+            Key=key,
+        )
+        return response["Body"].read()
+
+    def list_chunk_objects(self, base_path: str):
+        prefix = f"{base_path}/chunks/"
+        response = self.client.list_objects_v2(
+            Bucket=self.bucket,
+            Prefix=prefix,
+        )
+
+        if "Contents" not in response:
+            return []
+
+        objects = []
+
+        for obj in response["Contents"]:
+            key = obj["Key"]
+            if key.endswith(".bin"):
+                try:
+                    idx = int(
+                        key.split("chunk_")[1].replace(".bin", "")
+                    )
+                    objects.append((idx, key, obj["Size"]))
+                except:
+                    pass
+
+        return sorted(objects, key=lambda x: x[0])

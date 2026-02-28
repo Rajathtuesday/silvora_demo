@@ -40,9 +40,9 @@ class FileRecord(models.Model):
     )
 
     # 🔐 ENCRYPTED FILENAME
-    filename_ciphertext = models.BinaryField()
-    filename_nonce = models.BinaryField()
-    filename_mac = models.BinaryField()
+    filename_ciphertext = models.BinaryField(null=True, blank=True)
+    filename_nonce = models.BinaryField(null=True, blank=True)
+    filename_mac = models.BinaryField(null=True, blank=True)
 
     size = models.BigIntegerField(default=0)
 

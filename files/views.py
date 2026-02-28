@@ -77,11 +77,13 @@ def list_files(request):
             "file_id": str(f.id),
             "size": f.size,
             "upload_state": f.upload_state,
+            "filename_ciphertext": f.filename_ciphertext.hex() if f.filename_ciphertext else None,
+            "filename_nonce": f.filename_nonce.hex() if f.filename_nonce else None,
+            "filename_mac": f.filename_mac.hex() if f.filename_mac else None,
+            "created_at": f.created_at.isoformat(),
         }
         for f in files
     ])
-
-
 # ============================================================
 # STORAGE QUOTA
 # ============================================================
@@ -136,12 +138,15 @@ def list_trash(request):
     )
 
     return Response([
-        {
-            "file_id": str(f.id),
-            "size": f.size,
-            "deleted_at": f.deleted_at,
-        }
-        for f in trash
+    {
+        "file_id": str(f.id),
+        "size": f.size,
+        "deleted_at": f.deleted_at,
+        "filename_ciphertext": f.filename_ciphertext.hex(),
+        "filename_nonce": f.filename_nonce.hex(),
+        "filename_mac": f.filename_mac.hex(),
+    }
+    for f in trash
     ])
 
 
@@ -171,3 +176,132 @@ def restore_file(request, file_id):
         file.restore()
 
     return Response({"status": "restored"})
+
+
+# ============================================================
+# download
+# ============================================================
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_file(request, file_id):
+
+    file = get_object_or_404(
+        FileRecord,
+        id=file_id,
+        owner=request.user,
+        tenant=request.user.tenant,
+        deleted_at__isnull=True,
+        upload_state=FileRecord.UploadState.COMMITTED,
+    )
+
+    return Response({
+        "manifest_path": file.manifest_path,
+        "final_path": file.final_path,
+    })
+    
+    
+    
+# ============================================================
+# set filename (for testing - to be removed in future)
+# ============================================================
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def set_filename_metadata(request, file_id):
+
+    file = get_object_or_404(
+        FileRecord,
+        id=file_id,
+        owner=request.user,
+        tenant=request.user.tenant,
+        deleted_at__isnull=True,
+    )
+
+    cipher = request.data.get("filename_ciphertext")
+    nonce = request.data.get("filename_nonce")
+    mac = request.data.get("filename_mac")
+
+    if not cipher or not nonce or not mac:
+        return Response({"error": "Missing metadata"}, status=400)
+
+    file.filename_ciphertext = bytes.fromhex(cipher)
+    file.filename_nonce = bytes.fromhex(nonce)
+    file.filename_mac = bytes.fromhex(mac)
+
+    file.save(update_fields=[
+        "filename_ciphertext",
+        "filename_nonce",
+        "filename_mac",
+    ])
+
+    return Response({"status": "metadata_set"})
+
+
+
+
+# ==============================================================================
+from django.http import HttpResponse
+from .services.storage_gateway import StorageGateway
+from .services.upload_service import r2_base
+
+
+# ============================================================
+# DOWNLOAD MANIFEST
+# ============================================================
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_manifest(request, file_id):
+
+    file = get_object_or_404(
+        FileRecord,
+        id=file_id,
+        owner=request.user,
+        tenant=request.user.tenant,
+        deleted_at__isnull=True,
+        upload_state=FileRecord.UploadState.COMMITTED,
+    )
+
+    storage = StorageGateway()
+
+    manifest_bytes = storage.download_bytes(file.manifest_path)
+
+    return HttpResponse(
+        manifest_bytes,
+        content_type="application/json",
+    )
+
+
+# ============================================================
+# DOWNLOAD SINGLE CHUNK
+# ============================================================
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_chunk(request, file_id, index):
+
+    file = get_object_or_404(
+        FileRecord,
+        id=file_id,
+        owner=request.user,
+        tenant=request.user.tenant,
+        deleted_at__isnull=True,
+        upload_state=FileRecord.UploadState.COMMITTED,
+    )
+
+    storage = StorageGateway()
+
+    base = r2_base(
+        file.tenant_id,
+        file.owner_id,
+        file.id,
+    )
+
+    key = f"{base}/chunks/chunk_{index}.bin"
+
+    if not storage.exists(key):
+        return Response({"error": "Chunk not found"}, status=404)
+
+    blob = storage.download_bytes(key)
+
+    return HttpResponse(
+        blob,
+        content_type="application/octet-stream",
+    )

@@ -35,7 +35,7 @@ urlpatterns = [
     path('api/auth/', include('users.urls')),
 
     # Files endpoints
-    path('upload/', include('files.urls')),
+    path('', include('files.urls')),
         # NEW: master key endpoints
         
     # Healthcheck endpoint
