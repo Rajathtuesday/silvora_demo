@@ -62,3 +62,4 @@ class QuotaService:
 
         user_quota.save(update_fields=["used_bytes"])
         tenant_quota.save(update_fields=["used_bytes"])
+        return True

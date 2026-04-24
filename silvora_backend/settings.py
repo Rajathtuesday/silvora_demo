@@ -1,0 +1,165 @@
+import os
+from datetime import timedelta
+from pathlib import Path
+import dj_database_url
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# =====================================================
+# 🔐 SECURITY / ENV CONFIG
+# =====================================================
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-key-change-this")
+DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
+
+ALLOWED_HOSTS = [
+    "app.silvora.cloud",
+    "silvora.cloud",
+    "api.silvora.cloud",
+    "silvora-demo.onrender.com",
+    "localhost",
+    "127.0.0.1",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.onrender.com",
+    "https://silvora.cloud",
+    "https://api.silvora.cloud",
+    "https://app.silvora.cloud",
+]
+
+# =====================================================
+# 📦 INSTALLED APPS
+# =====================================================
+
+INSTALLED_APPS = [
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "corsheaders",
+
+    "files",
+    "users",
+    "tenants.apps.TenantsConfig",
+    "django_extensions",
+]
+
+AUTH_USER_MODEL = "users.User"
+
+# =====================================================
+# 🧱 MIDDLEWARE
+# =====================================================
+
+MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "silvora_backend.urls"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = "silvora_backend.wsgi.application"
+
+# =====================================================
+# 🛢 DATABASE
+# =====================================================
+
+DATABASES = {
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+        ssl_require=os.environ.get("DATABASE_URL") is not None
+    )
+}
+
+# =====================================================
+# 📁 STATIC & MEDIA
+# =====================================================
+
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# =====================================================
+# 🔥 DRF / JWT AUTH
+# =====================================================
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework_simplejwt.authentication.JWTAuthentication"
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated"
+    ],
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}
+
+# =====================================================
+# 🔄 CORS
+# =====================================================
+
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+else:
+    CORS_ALLOW_ALL_ORIGINS = False
+    CORS_ALLOWED_ORIGINS = [
+        "https://silvora.cloud",
+        "https://app.silvora.cloud",
+    ]
+
+# =====================================================
+# 📤 UPLOAD LIMITS
+# =====================================================
+
+DATA_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
+
+# =====================================================
+# ☁️ CLOUDFLARE R2 CONFIG
+# =====================================================
+
+R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
+R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
+R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else None
+R2_PUBLIC_BASE = f"{R2_ENDPOINT}/{R2_BUCKET_NAME}" if R2_ENDPOINT else None
