@@ -132,6 +132,8 @@ def restore_file(request, file_id):
             FileRecord, id=file_id, owner=request.user,
             tenant=request.user.tenant, deleted_at__isnull=False,
         )
+        QuotaService.get_or_create_user_quota(request.user)
+        QuotaService.get_or_create_tenant_quota(request.user.tenant)
         if not QuotaService.consume(request.user, file.size):
             return Response({"error": "Quota exceeded"}, status=403)
         file.restore_record()
