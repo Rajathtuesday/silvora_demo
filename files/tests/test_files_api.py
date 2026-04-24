@@ -8,6 +8,7 @@ from unittest.mock import patch, MagicMock
 from files.models import FileRecord
 from users.models import UserQuota, SubscriptionTier
 from tenants.models import Tenant
+from files.services.quota_service import QuotaService
 
 User = get_user_model()
 
@@ -44,7 +45,7 @@ class FileAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.status_code, 201)
         return res.json()["file_id"]
 
     # ---------------------------------------------------------
@@ -70,7 +71,7 @@ class FileAPITests(APITestCase):
             format="json",
         )
 
-        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.status_code, 201)
         self.assertIn("file_id", res.json())
 
     @patch("files.services.upload_service.StorageGateway")
@@ -107,6 +108,7 @@ class FileAPITests(APITestCase):
         quota, _ = UserQuota.objects.get_or_create(user=self.user)
         quota.used_bytes = 200
         quota.set_tier('pro') # 100GB
+        quota.save()
         
         limit = 100 * 1024 * 1024 * 1024
         
@@ -130,7 +132,7 @@ class FileAPITests(APITestCase):
         )
 
         quota, _ = UserQuota.objects.get_or_create(user=self.user)
-        quota.consume(50)
+        QuotaService.consume(self.user, 50)
 
         # delete
         res = self.client.delete(f"/file/{file.id}/delete/")

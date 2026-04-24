@@ -9,7 +9,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # 🔐 SECURITY / ENV CONFIG
 # =====================================================
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-dev-key-change-this")
+_secret = os.environ.get("DJANGO_SECRET_KEY")
+if not _secret and not os.environ.get("DJANGO_DEBUG", "False") == "True":
+    raise ValueError("DJANGO_SECRET_KEY environment variable is not set in production.")
+SECRET_KEY = _secret or "django-insecure-dev-key-change-this"
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [

@@ -34,16 +34,10 @@ class RegisterSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         email = validated_data["email"]
 
-        tenant = Tenant.objects.create(
-            name=email,
-            tenant_type=Tenant.TYPE_INDIVIDUAL,
-        )
-
         user = User.objects.create_user(
             username=email,
             email=email,
             password=validated_data["password"],
-            tenant=tenant,
         )
 
         return user
