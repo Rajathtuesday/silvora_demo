@@ -1,6 +1,7 @@
 # files/services/upload_service.py
 
 from datetime import timedelta
+from uuid import UUID
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db import transaction
@@ -30,14 +31,43 @@ class UploadService:
 
     def start(self, data):
 
+        file_id = data.get("file_id")
         total_size = int(data.get("size", 0))
         security_mode = data.get("security_mode")
+
+        if not file_id:
+            return {"error": "file_id required"}, 400
+
+        # Validate UUID
+        try:
+            UUID(file_id)
+        except Exception:
+            return {"error": "Invalid file_id"}, 400
+
+        # Prevent collision
+        if FileRecord.objects.filter(id=file_id).exists():
+            return {"error": "File already exists"}, 400
 
         if total_size <= 0:
             return {"error": "Invalid file size"}, 400
 
         if not self.user.tenant:
             return {"error": "User not assigned to tenant"}, 400
+
+        allowed_modes = [
+            FileRecord.SECURITY_STANDARD,
+            FileRecord.SECURITY_ZERO,
+        ]
+
+        if security_mode not in allowed_modes:
+            return {"error": "Invalid security mode"}, 400
+
+        cipher_hex = data.get("filename_ciphertext")
+        nonce_hex = data.get("filename_nonce")
+        mac_hex = data.get("filename_mac")
+
+        if not cipher_hex or not nonce_hex or not mac_hex:
+            return {"error": "Filename metadata required"}, 400
 
         user_quota = QuotaService.get_or_create_user_quota(self.user)
         QuotaService.get_or_create_tenant_quota(self.user.tenant)
@@ -48,18 +78,22 @@ class UploadService:
         expires_at = timezone.now() + timedelta(hours=24)
 
         file = FileRecord.objects.create(
+            id=file_id,  # 🔥 IMPORTANT CHANGE
             owner=self.user,
             tenant=self.user.tenant,
             security_mode=security_mode,
             upload_state=FileRecord.UploadState.INITIATED,
             upload_expires_at=expires_at,
+            filename_ciphertext=bytes.fromhex(cipher_hex),
+            filename_nonce=bytes.fromhex(nonce_hex),
+            filename_mac=bytes.fromhex(mac_hex),
         )
 
         return {
             "file_id": str(file.id),
             "upload_state": file.upload_state,
             "expires_at": expires_at.isoformat(),
-        }, 200
+        }, 201
 
     # ========================================================
     # RESUME
@@ -169,18 +203,10 @@ class UploadService:
 
         for index, key, size in chunk_objects:
 
-            data = self.storage.download_bytes(key)
-
-            if data is None or len(data) == 0:
-                return {"error": f"Corrupted chunk {index}"}, 400
-
-            sha256_hex = hashlib.sha256(data).hexdigest()
-
             manifest_chunks.append({
                 "i": index,
                 "o": offset,
                 "s": size,
-                "sha256": sha256_hex,
             })
 
             offset += size

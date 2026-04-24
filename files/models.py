@@ -25,7 +25,6 @@ class FileRecord(models.Model):
     SECURITY_ZERO = "zero_knowledge"
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    upload_id = models.UUIDField(default=uuid.uuid4, unique=True)
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -82,7 +81,11 @@ class FileRecord(models.Model):
         self.purge_after = now + timedelta(days=retention_days)
         self.save(update_fields=["deleted_at", "purge_after"])
 
-    def restore(self):
+    def restore_record(self):
+        """
+        Internal metadata reset. 
+        ⚠️ Use QuotaService.restore() for public flow to ensure quota safety.
+        """
         self.deleted_at = None
         self.purge_after = None
         self.save(update_fields=["deleted_at", "purge_after"])

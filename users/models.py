@@ -43,11 +43,22 @@ class MasterKeyEnvelope(models.Model):
     rotated_at = models.DateTimeField(null=True, blank=True)
     
     
+class SubscriptionTier(models.TextChoices):
+    FREE = 'free', 'Free (1GB)'
+    PRO = 'pro', 'Pro (100GB)'
+    ENTERPRISE = 'enterprise', 'Enterprise (1TB)'
+
 class UserQuota(models.Model):
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
         related_name="quota",
+    )
+    
+    tier = models.CharField(
+        max_length=20,
+        choices=SubscriptionTier.choices,
+        default=SubscriptionTier.FREE
     )
 
     limit_bytes = models.BigIntegerField(default=1 * 1024 * 1024 * 1024)
@@ -59,3 +70,13 @@ class UserQuota(models.Model):
         if self.limit_bytes == 0:
             return True
         return self.used_bytes + size <= self.limit_bytes
+
+    def set_tier(self, new_tier):
+        self.tier = new_tier
+        if new_tier == SubscriptionTier.FREE:
+            self.limit_bytes = 1 * 1024 * 1024 * 1024
+        elif new_tier == SubscriptionTier.PRO:
+            self.limit_bytes = 100 * 1024 * 1024 * 1024
+        elif new_tier == SubscriptionTier.ENTERPRISE:
+            self.limit_bytes = 1024 * 1024 * 1024 * 1024
+        self.save(update_fields=['tier', 'limit_bytes'])
