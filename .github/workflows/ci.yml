@@ -1,0 +1,30 @@
+name: backend-ci
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Lets settings.py skip the production secret-key guard during CI.
+      DJANGO_DEBUG: "True"
+      DJANGO_SECRET_KEY: "ci-only-secret-not-used-in-prod"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Django system check
+        run: python manage.py check
+
+      - name: Run test suite
+        run: python manage.py test --verbosity=2
