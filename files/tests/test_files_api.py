@@ -147,3 +147,51 @@ class FileAPITests(APITestCase):
 
         file.refresh_from_db()
         self.assertIsNone(file.deleted_at)
+
+
+class TenantIsolationTests(APITestCase):
+    """One user must never see or touch another tenant's files (no IDOR)."""
+
+    def setUp(self):
+        # A post_save signal auto-creates an individual tenant per user, so
+        # alice and bob are isolated by construction (no explicit tenant needed).
+        self.alice = User.objects.create_user(username="alice", password="password123")
+        self.bob = User.objects.create_user(username="bob", password="password123")
+
+        # Alice owns a committed file in her own (auto-created) tenant
+        self.alice_file = FileRecord.objects.create(
+            id=uuid.uuid4(),
+            owner=self.alice,
+            tenant=self.alice.tenant,
+            filename_ciphertext=b"abc",
+            filename_nonce=b"123",
+            filename_mac=b"456",
+            size=10,
+            security_mode="zero_knowledge",
+            storage_type=FileRecord.STORAGE_R2,
+            upload_state=FileRecord.UploadState.COMMITTED,
+        )
+
+    def test_bob_cannot_list_alices_files(self):
+        self.client.force_authenticate(self.bob)
+        res = self.client.get("/files/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.json()), 0)
+
+    def test_bob_cannot_delete_alices_file(self):
+        self.client.force_authenticate(self.bob)
+        res = self.client.delete(f"/file/{self.alice_file.id}/delete/")
+        self.assertEqual(res.status_code, 404)
+        self.alice_file.refresh_from_db()
+        self.assertIsNone(self.alice_file.deleted_at)  # untouched
+
+    def test_bob_cannot_fetch_alices_manifest(self):
+        self.client.force_authenticate(self.bob)
+        res = self.client.get(f"/download/file/{self.alice_file.id}/manifest/")
+        self.assertEqual(res.status_code, 404)
+
+    def test_alice_can_see_her_own_file(self):
+        self.client.force_authenticate(self.alice)
+        res = self.client.get("/files/")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.json()), 1)

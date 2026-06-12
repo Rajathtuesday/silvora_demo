@@ -56,6 +56,22 @@ INSTALLED_APPS = [
 AUTH_USER_MODEL = "users.User"
 
 # =====================================================
+# 🔑 PASSWORD STRENGTH (critical for a Zero-Knowledge vault)
+# The password derives the KEK that protects the master key, so a weak
+# password = a weak vault no matter how strong the cipher is.
+# =====================================================
+
+AUTH_PASSWORD_VALIDATORS = [
+    {
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {"min_length": 12},
+    },
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+]
+
+# =====================================================
 # 🧱 MIDDLEWARE
 # =====================================================
 
@@ -127,6 +143,20 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated"
     ],
+    # Throttling. ScopedRateThrottle only limits views that declare a
+    # `throttle_scope` (login / register / master-key), so authenticated
+    # file operations are NOT rate-limited. AnonRateThrottle is a general
+    # backstop for unauthenticated traffic.
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "30/min",
+        "register": "5/min",
+        "login": "10/min",
+        "master_key": "10/min",
+    },
 }
 
 SIMPLE_JWT = {

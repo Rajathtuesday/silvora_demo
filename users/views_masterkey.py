@@ -16,6 +16,7 @@ class GetMasterKeyMetaView(APIView):
     The client uses this to decrypt the vault locally.
     """
     permission_classes = [IsAuthenticated]
+    throttle_scope = "master_key"
 
     def get(self, request):
         envelope = get_object_or_404(
