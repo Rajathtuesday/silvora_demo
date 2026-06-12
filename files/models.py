@@ -75,7 +75,7 @@ class FileRecord(models.Model):
     @property
     def is_deleted(self):
         return self.deleted_at is not None
-    def mark_deleted(self, retention_days=30):
+    def mark_deleted(self, retention_days=7):
         now = timezone.now()
         self.deleted_at = now
         self.purge_after = now + timedelta(days=retention_days)
