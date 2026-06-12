@@ -22,13 +22,14 @@ from django.conf.urls.static import static
 from .healthcheck import healthcheck
 
 # SimpleJWT views
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenRefreshView
+from users.views import ThrottledTokenObtainPairView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
     # auth/token endpoints
-    path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # Register & masterkey: these views are defined in users.views
