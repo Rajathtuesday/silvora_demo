@@ -36,7 +36,12 @@ def upload_chunk(request, file_id, index):
         return Response({"error": "Missing chunk"}, status=400)
 
     service = UploadService(request.user)
-    data, status_code = service.upload_chunk(file_id, index, blob.read())
+    try:
+        data, status_code = service.upload_chunk(file_id, index, blob.read())
+    except Exception as e:  # TEMP DEBUG: surface the real R2 error to diagnose
+        import logging
+        logging.getLogger("django.request").exception("chunk upload failed")
+        return Response({"_debug": f"{type(e).__name__}: {e}"}, status=500)
     return Response(data, status=status_code)
 
 @api_view(["POST"])
