@@ -2,8 +2,14 @@ import os
 from datetime import timedelta
 from pathlib import Path
 import dj_database_url
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load a local .env if present. Real environment variables still take
+# precedence (load_dotenv does not override existing os.environ), so
+# production config set in the host's dashboard is unaffected.
+load_dotenv(BASE_DIR / ".env")
 
 # =====================================================
 # 🔐 SECURITY / ENV CONFIG
@@ -19,7 +25,7 @@ ALLOWED_HOSTS = [
     "app.silvora.cloud",
     "silvora.cloud",
     "api.silvora.cloud",
-    "silvora-demo.onrender.com",
+    ".onrender.com",  # any Render subdomain (e.g. silvora-backend.onrender.com)
     "localhost",
     "127.0.0.1",
 ]
@@ -30,6 +36,20 @@ CSRF_TRUSTED_ORIGINS = [
     "https://api.silvora.cloud",
     "https://app.silvora.cloud",
 ]
+
+# Production security headers. Opt-in via DJANGO_SECURE=True so local dev and
+# the test runner are never forced onto HTTPS. Render/most PaaS terminate TLS
+# at their proxy, hence SECURE_PROXY_SSL_HEADER.
+_SECURE = os.environ.get("DJANGO_SECURE", "False") == "True"
+if _SECURE:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
 
 # =====================================================
 # 📦 INSTALLED APPS

@@ -1,0 +1,32 @@
+# Render Blueprint for the Silvora backend (free tier).
+# Files live on Cloudflare R2; this service only routes encrypted chunks, so
+# the free instance is plenty for personal / small-beta use.
+#
+# After connecting the repo, set the R2_* and DATABASE_URL secrets in the
+# Render dashboard (they are marked sync:false so they are NOT stored in git).
+services:
+  - type: web
+    name: silvora-backend
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate"
+    startCommand: "gunicorn silvora_backend.wsgi:application"
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true        # Render generates a strong secret
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_SECURE
+        value: "True"              # turns on HTTPS redirect, HSTS, secure cookies
+      - key: PYTHON_VERSION
+        value: "3.12.4"
+      - key: DATABASE_URL
+        sync: false                # paste a Postgres URL (Render free Postgres)
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
