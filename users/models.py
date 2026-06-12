@@ -37,6 +37,21 @@ class MasterKeyEnvelope(models.Model):
     kdf_iterations = models.PositiveIntegerField()
     kdf_parallelism = models.PositiveIntegerField()
 
+    # ----- Recovery phrase: a second, independent wrapping of the master key -----
+    # The master key is also encrypted under a KEK derived from a 24-word recovery
+    # phrase. Nullable so pre-recovery accounts and migrations stay valid.
+    enc_master_key_recovery = models.BinaryField(null=True, blank=True)
+    enc_master_key_recovery_nonce = models.BinaryField(null=True, blank=True)
+    recovery_kdf_salt = models.BinaryField(null=True, blank=True)
+    recovery_kdf_memory_kb = models.PositiveIntegerField(null=True, blank=True)
+    recovery_kdf_iterations = models.PositiveIntegerField(null=True, blank=True)
+    recovery_kdf_parallelism = models.PositiveIntegerField(null=True, blank=True)
+
+    # Hash of the recovery-auth-key (also derived from the phrase). Lets the
+    # server verify the user really holds the phrase during a logged-out reset,
+    # without ever learning the phrase. Stored via Django's password hashers.
+    recovery_auth_hash = models.CharField(max_length=255, null=True, blank=True)
+
     key_version = models.PositiveIntegerField(default=1)
 
     created_at = models.DateTimeField(auto_now_add=True)
