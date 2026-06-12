@@ -210,6 +210,24 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 100 * 1024 * 1024
 # ☁️ CLOUDFLARE R2 CONFIG
 # =====================================================
 
+# Logging: surface server-side errors (incl. 500 tracebacks) to stderr so they
+# appear in the host's log stream even with DEBUG=False. Without this, Django's
+# default config swallows request tracebacks in production.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "simple": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "simple"},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+    },
+}
+
 R2_ACCOUNT_ID = os.environ.get("R2_ACCOUNT_ID")
 R2_BUCKET_NAME = os.environ.get("R2_BUCKET_NAME")
 R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
