@@ -8,6 +8,7 @@ urlpatterns = [
     path("file/start/", views.start_upload),
     path("file/<uuid:file_id>/resume/", views.resume_upload),
     path("file/<uuid:file_id>/chunk/<int:index>/", views.upload_chunk),
+    path("file/<uuid:file_id>/integrity/", views.upload_integrity),
     path("file/<uuid:file_id>/commit/", views.commit_upload),
 
     # Files
@@ -25,5 +26,6 @@ urlpatterns = [
     # path("file/<uuid:file_id>/metadata/", views.set_filename_metadata),
     # Download endpoints
     path("download/file/<uuid:file_id>/manifest/", views.download_manifest),
+    path("download/file/<uuid:file_id>/integrity/", views.download_integrity),
     path("download/file/<uuid:file_id>/chunk/<int:index>/", views.download_chunk),
 ]
