@@ -19,6 +19,17 @@ def r2_base(tenant_id, user_id, file_id):
     return f"Silvora/tenants/{tenant_id}/users/{user_id}/files/{file_id}"
 
 
+def integrity_key(base):
+    """Object key for the client-signed integrity manifest (opaque AEAD blob)."""
+    return f"{base}/integrity.bin"
+
+
+# Hard cap on the encrypted integrity blob. It holds one 32-byte SHA-256 per
+# chunk plus small JSON overhead, so even a 100 GB file (~50k chunks) stays well
+# under a few MB. 16 MB is a generous ceiling that still rejects abuse.
+MAX_INTEGRITY_BYTES = 16 * 1024 * 1024
+
+
 class UploadService:
 
     def __init__(self, user):
@@ -159,6 +170,42 @@ class UploadService:
         return {"stored": True}, 200
 
     # ========================================================
+    # INTEGRITY MANIFEST (client-signed, server-opaque)
+    # ========================================================
+
+    def store_integrity(self, file_id, data):
+        """Store the client's encrypted integrity manifest for this upload.
+
+        The blob is an opaque AEAD envelope (the server can't read it). It binds
+        every plaintext chunk hash + the total chunk count under a key only the
+        client holds, so download can detect reordering, truncation, or tamper.
+        """
+        if data is None or len(data) == 0:
+            return {"error": "Empty integrity manifest"}, 400
+
+        if len(data) > MAX_INTEGRITY_BYTES:
+            return {"error": "Integrity manifest too large"}, 413
+
+        file = get_object_or_404(
+            FileRecord,
+            id=file_id,
+            owner=self.user,
+            tenant=self.user.tenant,
+        )
+
+        # Only writable while the upload is still in flight.
+        if file.upload_state not in [
+            FileRecord.UploadState.INITIATED,
+            FileRecord.UploadState.UPLOADING,
+        ]:
+            return {"error": "Invalid upload state"}, 400
+
+        base = r2_base(file.tenant_id, file.owner_id, file.id)
+        self.storage.upload_bytes(data, integrity_key(base))
+
+        return {"stored": True}, 200
+
+    # ========================================================
     # COMMIT (HARDENED)
     # ========================================================
 
@@ -196,6 +243,11 @@ class UploadService:
 
         if not chunk_objects:
             return {"error": "No chunks uploaded"}, 400
+
+        # 🔐 INTEGRITY GATE: every committed file must carry a client-signed
+        # integrity manifest, so downloads can always be verified end to end.
+        if not self.storage.exists(integrity_key(base)):
+            return {"error": "Integrity manifest missing"}, 400
 
         manifest_chunks = []
         offset = 0

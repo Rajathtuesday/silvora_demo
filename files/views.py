@@ -6,7 +6,7 @@ from django.db import transaction
 from django.http import HttpResponse
 
 from .models import FileRecord
-from .services.upload_service import UploadService, r2_base
+from .services.upload_service import UploadService, r2_base, integrity_key
 from .services.quota_service import QuotaService
 from .services.storage_gateway import StorageGateway
 
@@ -37,6 +37,18 @@ def upload_chunk(request, file_id, index):
 
     service = UploadService(request.user)
     data, status_code = service.upload_chunk(file_id, index, blob.read())
+    return Response(data, status=status_code)
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def upload_integrity(request, file_id):
+    # The client posts the encrypted integrity manifest as raw bytes.
+    blob = request.body
+    if not blob:
+        return Response({"error": "Missing integrity manifest"}, status=400)
+
+    service = UploadService(request.user)
+    data, status_code = service.store_integrity(file_id, blob)
     return Response(data, status=status_code)
 
 @api_view(["POST"])
@@ -162,6 +174,21 @@ def download_manifest(request, file_id):
     )
     storage = StorageGateway()
     return HttpResponse(storage.download_bytes(file.manifest_path), content_type="application/json")
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def download_integrity(request, file_id):
+    file = get_object_or_404(
+        FileRecord, id=file_id, owner=request.user,
+        tenant=request.user.tenant, deleted_at__isnull=True,
+        upload_state=FileRecord.UploadState.COMMITTED,
+    )
+    storage = StorageGateway()
+    base = r2_base(file.tenant_id, file.owner_id, file.id)
+    key = integrity_key(base)
+    if not storage.exists(key):
+        return Response({"error": "Integrity manifest not found"}, status=404)
+    return HttpResponse(storage.download_bytes(key), content_type="application/octet-stream")
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
