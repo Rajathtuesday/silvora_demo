@@ -21,6 +21,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from .healthcheck import healthcheck
 from .legal import PrivacyPolicyView
+from .pages import LandingView
 
 # SimpleJWT views
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -28,6 +29,9 @@ from users.views import ThrottledTokenObtainPairView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
+    # Landing page
+    path('', LandingView.as_view(), name='landing'),
 
     # auth/token endpoints
     path('api/auth/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
