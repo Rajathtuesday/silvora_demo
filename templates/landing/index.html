@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Silvora. - E2EE Cloud Storage Made in India</title>
+
+<!-- CRITICAL SEO META TAGS -->
+<meta name="description" content="Silvora Cloud is a secure End-to-End Encrypted (E2EE) cloud storage service, built and hosted in India. Your data is private, safe, and sovereign.">
+<meta name="keywords" content="E2EE cloud storage, end-to-end encryption, Indian cloud storage, privacy-focused cloud, zero-knowledge storage, secure file storage, data privacy India">
+<meta name="author" content="Silvora Cloud">
+<link rel="canonical" href="https://silvora.cloud/">
+<meta property="og:title" content="Silvora Cloud - E2EE Cloud Storage Made in India">
+<meta property="og:description" content="End-to-End Encrypted cloud storage service built and operated from India. Your data, your control.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://silvora.cloud">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Silvora Cloud - E2EE Cloud Storage Made in India">
+<meta name="twitter:description" content="End-to-End Encrypted cloud storage service built and operated from India.">
+
+<!-- JSON-LD STRUCTURED DATA - MOST IMPORTANT FOR AI/SEARCH ENGINES -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Silvora Cloud",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web, Windows, macOS, Linux, Android, iOS",
+  "description": "Silvora Cloud is an End-to-End Encrypted (E2EE) cloud storage service made in India. A zero-knowledge cloud built for privacy-conscious users who value data ownership over surveillance.",
+  "countryOfOrigin": "India",
+  "featureList": "End-to-End Encryption, Zero-Knowledge Architecture, Secure File Sync, Cross-Platform Access, Data Sovereignty",
+  "offers": {
+    "@type": "Offer",
+    "category": "CloudStorage"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "Silvora",
+    "location": "India"
+  },
+  "sameAs": [
+    "https://twitter.com/silvoracloud",
+    "https://linkedin.com/company/silvoracloud"
+  ]
+}
+</script>
+
+<style>
+:root {
+  --bg: #0d0d12;
+  --text: #f5f5f7;
+  --accent: #9255e8;
+  --accent-soft: rgba(146, 85, 232, 0.45);
+  --glass: rgba(255, 255, 255, 0.05);
+}
+
+/* Global */
+body {
+  margin: 0;
+  font-family: "Inter", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+h1, h2, h3 {
+  margin: 0;
+}
+
+section {
+  padding: 90px 8vw;
+}
+
+/* Glow */
+.glow {
+  position: fixed;
+  width: 1200px;
+  height: 1200px;
+  top: -30%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, var(--accent-soft), transparent 60%);
+  filter: blur(200px);
+  opacity: .18;
+  pointer-events: none;
+}
+
+/* Nav */
+.nav {
+  padding: 28px 6vw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.logo {
+  font-size: 1.6rem;
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--text);
+}
+.dot { color: var(--accent); }
+
+.nav-links {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+}
+
+.nav a {
+  color: var(--text);
+  opacity: .8;
+  text-decoration: none;
+  transition: .25s;
+}
+.nav a:hover { opacity: 1; }
+.nav a.active { opacity: 1; color: var(--accent); }
+
+/* Hero */
+.hero {
+  text-align: center;
+  padding-top: 140px;
+}
+.hero-title {
+  font-size: clamp(2.6rem, 5vw, 4.5rem);
+  font-weight: 600;
+  line-height: 1.2;
+}
+.highlight { color: var(--accent); }
+.hero-sub {
+  max-width: 650px;
+  margin: 20px auto 35px;
+  opacity: 0.85;
+  line-height: 1.6;
+  font-size: 1.1rem;
+}
+
+/* SEO Definition Box - Explicitly answers "What is Silvora Cloud?" */
+.seo-definition {
+  background: rgba(146, 85, 232, 0.08);
+  border-left: 4px solid var(--accent);
+  padding: 22px 28px;
+  margin: 40px auto;
+  max-width: 700px;
+  border-radius: 0 12px 12px 0;
+  text-align: left;
+}
+.seo-definition h3 {
+  color: var(--accent);
+  margin-bottom: 10px;
+  font-size: 1.2rem;
+}
+.seo-definition p {
+  opacity: 0.9;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.indian-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-weight: 600;
+  color: #ff9933;
+}
+.indian-flag::before {
+  content: "";
+  width: 20px;
+  height: 14px;
+  background: linear-gradient(to bottom, #ff9933 33%, #ffffff 33% 66%, #138808 66%);
+  border-radius: 2px;
+}
+
+.btn {
+  padding: 16px 42px;
+  border-radius: 10px;
+  background: var(--accent);
+  border: none;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: .25s ease;
+  display: inline-block;
+  text-decoration: none;
+}
+.btn:hover {
+  opacity: .85;
+  transform: translateY(-2px);
+}
+
+/* Features */
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+  gap: 36px;
+  margin-top: 40px;
+}
+.feature {
+  background: var(--glass);
+  padding: 32px;
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  text-align: center;
+  line-height: 1.6;
+  opacity: 0;
+  transform: translateY(40px);
+}
+.feature h3 { color: var(--accent); margin-bottom: 12px; }
+
+/* Use cases */
+.usecases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px,1fr));
+  gap: 36px;
+}
+.uc {
+  background: var(--glass);
+  padding: 28px;
+  border-radius: 14px;
+  opacity: 0;
+  transform: translateY(40px);
+}
+.uc p { opacity: .75; }
+
+/* CTA block */
+.cta-block {
+  background: var(--glass);
+  text-align: center;
+  padding: 80px 10vw;
+  border-radius: 20px;
+  margin: 40px auto;
+  max-width: 900px;
+}
+.cta-block p {
+  opacity: .85;
+  max-width: 600px;
+  margin: 14px auto 30px;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 35px;
+  opacity: .5;
+  font-size: .9rem;
+}
+footer a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+/* Modal */
+.modal-bg {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.65);
+  backdrop-filter: blur(4px);
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+}
+.modal-bg.active { display: flex; }
+
+.modal {
+  background: var(--glass);
+  border: 1px solid rgba(255,255,255,.08);
+  width: 90%;
+  max-width: 650px;
+  border-radius: 16px;
+  padding: 0 0 16px;
+  animation: pop .35s ease;
+}
+@keyframes pop {
+  from { transform: scale(.92); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal header {
+  padding: 18px 22px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.modal iframe {
+  width: 100%;
+  height: 520px;
+  border: none;
+  border-radius: 0 0 14px 14px;
+}
+
+.close-btn {
+  cursor: pointer;
+  opacity: .7;
+  transition: .2s;
+}
+.close-btn:hover { opacity: 1; }
+
+/* Reveal */
+.reveal {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  transition: .65s ease-out;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .nav { flex-direction: column; gap: 20px; }
+  .nav-links { gap: 18px; }
+  section { padding: 60px 5vw; }
+  .hero { padding-top: 100px; }
+}
+</style>
+</head>
+
+<body>
+<div class="glow"></div>
+
+<header class="nav">
+  <a href="/" class="logo">Silvora<span class="dot">.</span></a>
+  <div class="nav-links">
+    <a href="/" class="active">Home</a>
+    <a href="#about">About</a>
+    <a href="#features">Features</a>
+    <a href="javascript:void(0)" onclick="openModal()">Early Access</a>
+  </div>
+</header>
+
+<section class="hero">
+  <h1 class="hero-title">
+    Your files.<br>
+    <span class="highlight">Encrypted by you.</span><br>
+    Only for you.
+  </h1>
+
+  <!-- EXPLICIT DEFINITION FOR SEO/AI -->
+  <div class="seo-definition" id="about">
+    <h3>What is Silvora Cloud?</h3>
+    <p><strong>Silvora Cloud is an End-to-End Encrypted (E2EE) cloud storage service made in India.</strong> We provide a zero-knowledge architecture where only you hold the encryption keys. Your data remains private, secure, and sovereign-never accessible to us or any third party.</p>
+    <div class="indian-flag">Built with pride in India</div>
+  </div>
+
+  <p class="hero-sub">
+    A zero-knowledge cloud built for those who value ownership, not surveillance.
+    Store, sync, and share files with military-grade encryption-only you have the keys.
+  </p>
+  <button class="btn" onclick="openModal()">Request Early Access</button>
+</section>
+
+<section id="features">
+  <h2 style="text-align:center;margin-bottom:38px;">Why Silvora?</h2>
+  <div class="features">
+    <div class="feature"><h3>End-to-End Encrypted</h3><p>Files encrypted on your device before upload. Nobody else can read them-not even us.</p></div>
+    <div class="feature"><h3>Your Keys, Your Control</h3><p>You control encryption keys. True data ownership with zero backdoor access.</p></div>
+    <div class="feature"><h3>Secure Sync Across Devices</h3><p>Access your encrypted files safely on all your devices with automatic sync.</p></div>
+    <div class="feature"><h3>Data Sovereignty</h3><p>Hosted and operated from India, complying with local data protection norms.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2 style="text-align:center;margin-bottom:38px;">Made For You</h2>
+  <div class="usecases">
+    <div class="uc"><h3>Privacy-Driven Creators</h3><p>Protect your unreleased work with client-side encryption.</p></div>
+    <div class="uc"><h3>Students & Researchers</h3><p>Safeguard academic projects, theses, and sensitive data.</p></div>
+    <div class="uc"><h3>Small Teams & Startups</h3><p>Share securely within your team-no vendor lock-in or surveillance.</p></div>
+    <div class="uc"><h3>Indian Businesses</h3><p>Keep data within India with encryption you control.</p></div>
+  </div>
+</section>
+
+<section class="cta-block">
+  <h2>Launch Your Private Cloud</h2>
+  <p>Join as a founding user and help shape the future of privacy-first cloud storage in India.</p>
+  <button class="btn" onclick="openModal()">Join Early Access</button>
+</section>
+
+<footer>
+  &copy; 2026 Silvora Cloud - End-to-End Encrypted Cloud Storage Made in India.<br>
+  <small style="opacity:0.7;">Your Cloud. Your Control. Your Country.</small><br>
+  <small><a href="/privacy/">Privacy Policy</a></small>
+</footer>
+
+<!-- Modal -->
+<div id="modalBG" class="modal-bg">
+  <div class="modal">
+    <header>
+      Join Early Access
+      <span class="close-btn" onclick="closeModal()">&#10005;</span>
+    </header>
+    <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSehqVJhtiQCVZL29cFUbMRVPUTY-U_NLFuMvkg90cvO_eYwZA/viewform?embedded=true" width="640" height="946" frameborder="0" marginheight="0" marginwidth="0">Loading&hellip;</iframe>
+  </div>
+</div>
+
+<script>
+const modal = document.getElementById("modalBG");
+function openModal() { modal.classList.add("active"); }
+function closeModal() { modal.classList.remove("active"); }
+
+// Close modal on ESC key
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+// reveal animation
+const obs = new IntersectionObserver(entries => {
+  entries.forEach(e => e.isIntersecting && e.target.classList.add("reveal"));
+});
+document.querySelectorAll('.feature,.uc').forEach(f => obs.observe(f));
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener('click', function(e) {
+    e.preventDefault();
+    const targetId = this.getAttribute('href');
+    if(targetId === '#') return;
+    const targetElement = document.querySelector(targetId);
+    if(targetElement) {
+      window.scrollTo({
+        top: targetElement.offsetTop - 80,
+        behavior: 'smooth'
+      });
+    }
+  });
+});
+</script>
+
+</body>
+</html>
