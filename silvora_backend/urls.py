@@ -20,7 +20,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from .healthcheck import healthcheck
-from .legal import PrivacyPolicyView
+from .legal import PrivacyPolicyView, TermsOfServiceView
 from .pages import LandingView
 
 # SimpleJWT views
@@ -49,6 +49,7 @@ urlpatterns = [
 
     # Legal
     path('privacy/', PrivacyPolicyView.as_view(), name='privacy_policy'),
+    path('terms/', TermsOfServiceView.as_view(), name='terms_of_service'),
 ]
 
 # Serve media in development
