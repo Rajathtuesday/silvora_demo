@@ -145,3 +145,10 @@ class RecoverSerializer(_NewPasswordEnvelope):
 class ChangePasswordSerializer(_NewPasswordEnvelope):
     """Logged-in change: client decrypts with old password, re-wraps with new."""
     pass
+
+
+# ========================= DELETE ACCOUNT ========================
+class DeleteAccountSerializer(serializers.Serializer):
+    """Logged-in account deletion: requires the current password as a final
+    confirmation before destroying the account and its data."""
+    password = serializers.CharField()

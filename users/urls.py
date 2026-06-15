@@ -9,6 +9,7 @@ from .views_masterkey import (
     RecoveryStartView,
     RecoverCompleteView,
 )
+from .views_account import DeleteAccountView
 
 urlpatterns = [
     path("register/", RegisterView.as_view()),
@@ -17,4 +18,5 @@ urlpatterns = [
     path("master-key/change-password/", ChangePasswordView.as_view()),
     path("recover/start/", RecoveryStartView.as_view()),
     path("recover/", RecoverCompleteView.as_view()),
+    path("account/delete/", DeleteAccountView.as_view()),
 ]

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service — Silvora</title>
+<style>
+  :root {
+    --bg: #080910;
+    --surface: #0F1018;
+    --card: #141620;
+    --primary: #5B4FE8;
+    --primary-light: #7B6FF8;
+    --gold: #D4AF6A;
+    --text: #FFFFFF;
+    --text-secondary: #8A8FAA;
+    --text-muted: #4A4F6A;
+    --border: #232639;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .brand-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, var(--primary-light), var(--gold));
+  }
+  .brand-name {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 18px 0 4px;
+  }
+  .updated {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+  .card.beta {
+    border-color: rgba(212, 175, 106, 0.35);
+    background: rgba(212, 175, 106, 0.06);
+  }
+  .card.beta strong { color: var(--gold); }
+  .card.warn {
+    border-color: rgba(255, 184, 77, 0.35);
+    background: rgba(255, 184, 77, 0.06);
+  }
+  .card.warn strong { color: #FFB84D; }
+  h2 {
+    font-size: 18px;
+    color: var(--text);
+    margin: 36px 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 15px;
+    color: var(--primary-light);
+    margin: 20px 0 6px;
+  }
+  p, li { color: var(--text-secondary); font-size: 15px; }
+  ul { padding-left: 22px; margin: 8px 0; }
+  li { margin-bottom: 6px; }
+  a { color: var(--primary-light); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 13px;
+    color: var(--gold);
+  }
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-name">Silvora</span>
+  </div>
+  <h1>Terms of Service</h1>
+  <div class="updated">Last updated: 15 June 2026</div>
+
+  <div class="card beta">
+    <strong>Beta software.</strong> Silvora is currently in a closed/limited beta,
+    provided free of charge. Features, limits, and these terms may change as the
+    product develops. We'll update this page if anything material changes.
+  </div>
+
+  <p>
+    These Terms of Service ("Terms") govern your use of Silvora, a zero-knowledge,
+    end-to-end encrypted (E2EE) file storage service ("Silvora", "we", "us"). By
+    creating an account or using the app, you agree to these Terms. If you don't
+    agree, please don't use Silvora.
+  </p>
+
+  <h2>1. The service</h2>
+  <p>
+    Silvora lets you store files that are encrypted on your device before they're
+    uploaded. We operate the infrastructure that stores your encrypted data, but by
+    design we do not hold the keys needed to decrypt it. See our
+    <a href="/privacy/">Privacy Policy</a> for details on exactly what we can and
+    cannot see.
+  </p>
+
+  <h2>2. Your account</h2>
+  <ul>
+    <li>You must provide a valid email address and a password meeting our minimum
+      strength requirements to register.</li>
+    <li>You're responsible for keeping your login credentials and your device(s)
+      secure. Anyone with access to your unlocked device or your password and
+      recovery phrase can access your files.</li>
+    <li>You must be at least 13 years old to use Silvora.</li>
+  </ul>
+
+  <div class="card warn">
+    <strong>Your password and recovery phrase are the only way to decrypt your
+    files.</strong> Because Silvora is zero-knowledge, we never have access to your
+    encryption key. If you lose <em>both</em> your password and your 24-word
+    recovery phrase, your files are permanently and irrecoverably lost — there is
+    no "forgot password" support path that can restore them. Store your recovery
+    phrase somewhere safe.
+  </div>
+
+  <h2>3. Storage limits</h2>
+  <p>
+    Your account has a storage quota based on your plan (Free, Pro, or Enterprise,
+    as described in the app). During the beta, plans and limits may be adjusted; we
+    won't delete files to enforce a reduced quota retroactively without notice.
+  </p>
+
+  <h2>4. Acceptable use</h2>
+  <p>You agree not to use Silvora to:</p>
+  <ul>
+    <li>Store or distribute content that is illegal under applicable law,
+      including child sexual abuse material, regardless of encryption.</li>
+    <li>Attempt to disrupt, overload, or gain unauthorized access to Silvora's
+      infrastructure or other users' accounts.</li>
+    <li>Use the service in a way that violates the rights of others.</li>
+  </ul>
+  <p>
+    Because file contents and filenames are encrypted on your device, we cannot
+    inspect what you store. If we become aware of a violation (for example, through
+    a valid legal order, abuse reports, or anomalous account activity), we may
+    suspend or terminate the account involved. We cannot decrypt or hand over file
+    contents we don't have access to.
+  </p>
+
+  <h2>5. Beta status — no uptime or data guarantees</h2>
+  <ul>
+    <li>Silvora is provided <strong>"as is"</strong> and <strong>"as available"</strong>,
+      without warranties of any kind, express or implied, including
+      merchantability, fitness for a particular purpose, or non-infringement.</li>
+    <li>As beta software, the service may have downtime, bugs, or data-affecting
+      issues. While we take backups and reliability seriously, you should not rely
+      on Silvora as your <em>only</em> copy of important files during the beta.</li>
+    <li>To the maximum extent permitted by law, Silvora and its operators are not
+      liable for any indirect, incidental, or consequential damages, or for loss
+      of data, arising from your use of the service.</li>
+  </ul>
+
+  <h2>6. Deleting your account &amp; data</h2>
+  <ul>
+    <li>You can permanently delete your account and all associated data at any
+      time from <strong>Settings → Delete Account</strong> in the app. This
+      removes your encrypted files from storage, your encryption key envelopes,
+      and your account record. This action is immediate and cannot be undone.</li>
+    <li>We may also terminate accounts that violate these Terms, with notice where
+      reasonably possible.</li>
+  </ul>
+
+  <h2>7. Changes to these terms</h2>
+  <p>
+    We may update these Terms as Silvora moves from beta toward general
+    availability. Material changes will be reflected on this page with an updated
+    "Last updated" date, and where practical we'll notify testers directly.
+  </p>
+
+  <h2>8. Governing law</h2>
+  <p>
+    These Terms are governed by the laws of India, without regard to conflict-of-law
+    principles.
+  </p>
+
+  <h2>9. Contact</h2>
+  <p>Questions about these Terms: <a href="mailto:fortunecloudmentors@gmail.com">fortunecloudmentors@gmail.com</a></p>
+
+  <footer>
+    Silvora — zero-knowledge encrypted storage. See also our
+    <a href="/privacy/">Privacy Policy</a>.
+  </footer>
+
+</div>
+</body>
+</html>
