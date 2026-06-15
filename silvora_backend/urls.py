@@ -20,6 +20,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from .healthcheck import healthcheck
+from .legal import PrivacyPolicyView
 
 # SimpleJWT views
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -41,8 +42,9 @@ urlpatterns = [
         
     # Healthcheck endpoint
     path('healthz/', healthcheck, name='healthcheck'),
-    #
-    
+
+    # Legal
+    path('privacy/', PrivacyPolicyView.as_view(), name='privacy_policy'),
 ]
 
 # Serve media in development

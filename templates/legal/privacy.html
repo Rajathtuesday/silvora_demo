@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Silvora</title>
+<style>
+  :root {
+    --bg: #080910;
+    --surface: #0F1018;
+    --card: #141620;
+    --primary: #5B4FE8;
+    --primary-light: #7B6FF8;
+    --gold: #D4AF6A;
+    --text: #FFFFFF;
+    --text-secondary: #8A8FAA;
+    --text-muted: #4A4F6A;
+    --border: #232639;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.65;
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .brand-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, var(--primary-light), var(--gold));
+  }
+  .brand-name {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+  h1 {
+    font-size: 28px;
+    margin: 18px 0 4px;
+  }
+  .updated {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 32px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+  .card.beta {
+    border-color: rgba(212, 175, 106, 0.35);
+    background: rgba(212, 175, 106, 0.06);
+  }
+  .card.beta strong { color: var(--gold); }
+  h2 {
+    font-size: 18px;
+    color: var(--text);
+    margin: 36px 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 15px;
+    color: var(--primary-light);
+    margin: 20px 0 6px;
+  }
+  p, li { color: var(--text-secondary); font-size: 15px; }
+  ul { padding-left: 22px; margin: 8px 0; }
+  li { margin-bottom: 6px; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-right: 6px;
+  }
+  .tag.cant { background: rgba(61, 214, 140, 0.12); color: #3DD68C; }
+  .tag.can { background: rgba(255, 184, 77, 0.12); color: #FFB84D; }
+  a { color: var(--primary-light); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 13px;
+    color: var(--gold);
+  }
+  footer {
+    margin-top: 48px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-name">Silvora</span>
+  </div>
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: 15 June 2026</div>
+
+  <div class="card beta">
+    <strong>Beta software.</strong> Silvora is currently in a closed/limited beta.
+    Features, infrastructure, and this policy may change as the product develops.
+    If anything here changes in a way that affects your data, we'll update this page
+    and, where practical, notify testers directly.
+  </div>
+
+  <p>
+    Silvora is a zero-knowledge, end-to-end encrypted (E2EE) file storage app.
+    This page explains, as plainly as possible, what information Silvora collects,
+    what is encrypted before it ever reaches our servers, and what — by design —
+    we are technically unable to see.
+  </p>
+
+  <h2>The short version</h2>
+  <p>
+    <span class="tag cant">We can't see</span> your files, your filenames, or the
+    encryption key that protects them. They are encrypted on your device before
+    upload, and only your device — using your password or 24-word recovery phrase —
+    can decrypt them.
+  </p>
+  <p>
+    <span class="tag can">We can see</span> your account email, the size of each
+    file (in bytes), and timestamps (when a file was uploaded, modified, or deleted).
+    This is unavoidable metadata needed to operate storage, quotas, and the file
+    list — but it never reveals what's inside a file or what it's called.
+  </p>
+
+  <h2>Information we collect</h2>
+
+  <h3>Account information</h3>
+  <ul>
+    <li><strong>Email address</strong> — used as your account identifier (login)
+      and, if you choose, for account-related communication (e.g. security notices).</li>
+    <li><strong>Password</strong> — stored only as a one-way hash using Django's
+      standard password hashing. We never store, log, or have access to your
+      plaintext password.</li>
+  </ul>
+
+  <h3>Encryption keys and recovery</h3>
+  <ul>
+    <li><strong>Encrypted master key envelope</strong> — your master encryption key
+      itself never leaves your device in usable form. We only store an encrypted
+      "envelope" (ciphertext + nonce) that can only be opened on your device using
+      a key derived from your password (via Argon2id).</li>
+    <li><strong>Recovery envelope</strong> — a second encrypted copy of the same
+      master key, openable only with your 24-word recovery phrase. We store this
+      envelope, but never the phrase itself.</li>
+    <li><strong>Recovery phrase verification hash</strong> — to confirm you've
+      entered the correct recovery phrase, we store a one-way hash derived from it
+      (via HKDF, then a standard password hash). This lets the server verify
+      "yes, that's the right phrase" without ever learning or storing the phrase.</li>
+  </ul>
+
+  <h3>Your files</h3>
+  <ul>
+    <li><strong>File contents</strong> — encrypted on your device (XChaCha20-Poly1305)
+      before upload. The server stores only ciphertext and cannot decrypt it.</li>
+    <li><strong>Filenames</strong> — also encrypted on your device before upload
+      (ciphertext, nonce, and integrity tag). The server cannot read your filenames.</li>
+    <li><strong>File size, in bytes</strong> — visible to the server, since it's
+      needed to allocate storage and enforce your quota. File size does not reveal
+      file contents.</li>
+    <li><strong>Timestamps</strong> — when a file was created, modified, or deleted,
+      used for the file list, sync, and cleanup of deleted items.</li>
+    <li><strong>Internal storage identifiers</strong> — opaque IDs and storage paths
+      used internally to locate the encrypted blob in storage. These do not contain
+      or reveal your filename or content.</li>
+  </ul>
+
+  <h3>Storage usage</h3>
+  <ul>
+    <li>We track how many bytes your account has used against your plan's quota
+      (Free / Pro / Enterprise tiers). This is a running total, derived from the
+      file sizes above.</li>
+  </ul>
+
+  <h3>Standard infrastructure logs</h3>
+  <ul>
+    <li>Like virtually all web services, our hosting and network providers
+      (see "Infrastructure" below) generate routine connection logs (IP address,
+      timestamp, request path) for security, abuse prevention, and debugging.
+      These are operational logs, not something Silvora's application code
+      reads or stores long-term.</li>
+  </ul>
+
+  <h2>What we cannot do</h2>
+  <ul>
+    <li>We cannot read the contents of your files.</li>
+    <li>We cannot read your filenames.</li>
+    <li>We cannot recover your account if you lose <em>both</em> your password
+      and your 24-word recovery phrase — there is no "reset" path that bypasses
+      encryption, because we never have access to the key.</li>
+    <li>We cannot view, sell, or share data we don't have. We have nothing to
+      hand over for your files even if compelled to — only encrypted bytes.</li>
+  </ul>
+
+  <h2>Infrastructure &amp; third parties</h2>
+  <p>Silvora runs on a small set of infrastructure providers, each of which only
+    ever sees encrypted data (where applicable):</p>
+  <ul>
+    <li><strong>Render</strong> — hosts the backend application server.</li>
+    <li><strong>Neon (PostgreSQL)</strong> — hosts the database (account records,
+      encrypted key envelopes, file metadata).</li>
+    <li><strong>Cloudflare R2</strong> — stores encrypted file blobs.</li>
+  </ul>
+  <p>We do not sell your data, and we do not share it with advertisers. We do not
+    run analytics or tracking SDKs inside the app.</p>
+
+  <h2>Data retention &amp; deletion</h2>
+  <ul>
+    <li>When you delete a file, it's marked for deletion and removed from your
+      visible file list immediately, with the underlying encrypted blob purged
+      from storage shortly after.</li>
+    <li>If you'd like your account and all associated data permanently deleted,
+      contact us at the email below. As this is a beta, account deletion is
+      currently handled manually on request.</li>
+  </ul>
+
+  <h2>Children's privacy</h2>
+  <p>Silvora is not directed at children under 13, and we do not knowingly collect
+    information from children under 13.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>We may update this policy as Silvora moves from beta toward general
+    availability. Material changes will be reflected on this page with an updated
+    "Last updated" date.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy or your data: <a href="mailto:fortunecloudmentors@gmail.com">fortunecloudmentors@gmail.com</a></p>
+
+  <footer>
+    Silvora — zero-knowledge encrypted storage.
+  </footer>
+
+</div>
+</body>
+</html>
