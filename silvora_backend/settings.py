@@ -69,6 +69,7 @@ INSTALLED_APPS = [
 
     "files",
     "users",
+    "billing",
     "tenants.apps.TenantsConfig",
     "django_extensions",
 ]
@@ -176,6 +177,8 @@ REST_FRAMEWORK = {
         "register": "5/min",
         "login": "10/min",
         "master_key": "10/min",
+        "email_verify": "5/min",
+        "billing": "10/min",
     },
 }
 
@@ -234,3 +237,30 @@ R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY")
 R2_ENDPOINT = f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com" if R2_ACCOUNT_ID else None
 R2_PUBLIC_BASE = f"{R2_ENDPOINT}/{R2_BUCKET_NAME}" if R2_ENDPOINT else None
+
+# =====================================================
+# 📧 EMAIL (verification, billing notices)
+# =====================================================
+# Gmail SMTP relay — same mechanism as Rasova's setup, kept deliberately
+# consistent across both projects. EMAIL_USER/EMAIL_PASSWORD are a Gmail App
+# Password, not the account password.
+EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get("EMAIL_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_USER", "noreply@silvora.cloud")
+
+# Public base URL used to build the verification link sent by email (no
+# `request` object available outside the view that triggers the send, and
+# this keeps the link host correct in dev vs prod without guessing from env).
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://app.silvora.cloud")
+
+# =====================================================
+# 💳 RAZORPAY (subscription billing — Silvora's own account,
+# separate from any restaurant customer's Razorpay credentials elsewhere)
+# =====================================================
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")

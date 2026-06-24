@@ -162,6 +162,7 @@ def get_storage_quota(request):
     return Response({
         "used_bytes": quota.used_bytes,
         "limit_bytes": quota.limit_bytes,
+        "tier": quota.tier,
     })
 
 @api_view(["GET"])
