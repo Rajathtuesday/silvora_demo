@@ -16,6 +16,14 @@ class User(AbstractUser):
         blank=True,
     )
 
+    # Non-blocking: an unverified user can still log in and use the vault.
+    # Recovery already works without email (the 24-word phrase is the real
+    # safety net) — gating access on a verification email arriving would risk
+    # locking someone out of their own encrypted files over a deliverability
+    # hiccup, which is a worse failure than an unverified address.
+    email_verified = models.BooleanField(default=False)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
+
     def __str__(self):
         return self.email or self.username
 

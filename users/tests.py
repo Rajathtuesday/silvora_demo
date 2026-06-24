@@ -1,9 +1,11 @@
+from django.core import mail
 from django.core.cache import cache
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 from rest_framework import status
 
 from users.models import MasterKeyEnvelope
+from users.services import make_verification_token
 
 User = get_user_model()
 
@@ -173,3 +175,111 @@ class RecoveryFlowTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {r.json()['access']}")
         res = self.client.post(self.SETUP, self.ENV, format="json")
         self.assertEqual(res.status_code, 201, res.content)
+
+
+class EmailVerificationTests(APITestCase):
+    """Verification is non-blocking by design: recovery already works without
+    email, so an unverified account must still log in and use the vault
+    fully. These lock in that design, not just the happy path."""
+
+    REGISTER = "/api/auth/register/"
+    TOKEN = "/api/auth/token/"
+    RESEND = "/api/auth/resend-verification/"
+
+    PW = "Str0ng!Vault#Key2026"
+
+    def setUp(self):
+        cache.clear()
+        mail.outbox = []
+
+    def _verify_url(self, token):
+        return f"/api/auth/verify-email/{token}/"
+
+    def _auth(self, email, password):
+        res = self.client.post(self.TOKEN, {"username": email, "password": password}, format="json")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.json()['access']}")
+
+    def test_register_sends_a_verification_email(self):
+        res = self.client.post(self.REGISTER, {"email": "verify1@example.com", "password": self.PW}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("verify1@example.com", mail.outbox[0].to)
+        self.assertIn("/api/auth/verify-email/", mail.outbox[0].body)
+
+    def test_unverified_account_can_still_log_in_and_act(self):
+        """The core non-blocking guarantee: nothing about login depends on
+        email_verified being true."""
+        self.client.post(self.REGISTER, {"email": "unverified@example.com", "password": self.PW}, format="json")
+        user = User.objects.get(email="unverified@example.com")
+        self.assertFalse(user.email_verified)
+
+        cache.clear()
+        res = self.client.post(self.TOKEN, {"username": "unverified@example.com", "password": self.PW}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+    def test_valid_token_marks_email_verified(self):
+        self.client.post(self.REGISTER, {"email": "verify2@example.com", "password": self.PW}, format="json")
+        user = User.objects.get(email="verify2@example.com")
+        token = make_verification_token(user)
+
+        res = self.client.get(self._verify_url(token))
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+
+        user.refresh_from_db()
+        self.assertTrue(user.email_verified)
+        self.assertIsNotNone(user.email_verified_at)
+
+    def test_invalid_token_rejected_without_crashing(self):
+        res = self.client.get(self._verify_url("not-a-real-token"))
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("error", res.json())
+
+    def test_resend_sends_a_second_email_when_unverified(self):
+        self.client.post(self.REGISTER, {"email": "resend1@example.com", "password": self.PW}, format="json")
+        cache.clear()
+        self._auth("resend1@example.com", self.PW)
+        mail.outbox = []  # clear the register-time email, isolate the resend
+
+        res = self.client.post(self.RESEND, {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()["status"], "verification_sent")
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_resend_is_a_noop_once_already_verified(self):
+        self.client.post(self.REGISTER, {"email": "resend2@example.com", "password": self.PW}, format="json")
+        user = User.objects.get(email="resend2@example.com")
+        token = make_verification_token(user)
+        self.client.get(self._verify_url(token))  # verify it first
+
+        cache.clear()
+        self._auth("resend2@example.com", self.PW)
+        mail.outbox = []
+
+        res = self.client.post(self.RESEND, {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()["status"], "already_verified")
+        self.assertEqual(len(mail.outbox), 0)  # no email sent for an already-verified account
+
+    def test_resend_requires_authentication(self):
+        res = self.client.post(self.RESEND, {}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_me_endpoint_reflects_verification_state(self):
+        self.client.post(self.REGISTER, {"email": "me1@example.com", "password": self.PW}, format="json")
+        cache.clear()
+        self._auth("me1@example.com", self.PW)
+
+        res = self.client.get("/api/auth/me/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json(), {"email": "me1@example.com", "email_verified": False})
+
+        user = User.objects.get(email="me1@example.com")
+        token = make_verification_token(user)
+        self.client.get(self._verify_url(token))
+
+        res = self.client.get("/api/auth/me/")
+        self.assertTrue(res.json()["email_verified"])
+
+    def test_me_requires_authentication(self):
+        res = self.client.get("/api/auth/me/")
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)

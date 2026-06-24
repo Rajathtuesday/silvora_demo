@@ -43,7 +43,11 @@ urlpatterns = [
     # Files endpoints
     path('', include('files.urls')),
         # NEW: master key endpoints
-        
+
+    # Billing (Razorpay subscriptions)
+    path('api/billing/', include('billing.urls')),
+
+
     # Healthcheck endpoint
     path('healthz/', healthcheck, name='healthcheck'),
 
