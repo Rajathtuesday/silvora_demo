@@ -248,6 +248,12 @@ EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
+# Django's SMTP backend has no timeout at all by default — a slow/blocked
+# connection to Gmail hangs the entire request indefinitely instead of
+# failing fast, which defeats the point of registration being designed to
+# never block on email delivery. 10s is generous for a normal SMTP
+# handshake and short enough that a stuck connection still fails fast.
+EMAIL_TIMEOUT = 10
 EMAIL_HOST_USER = os.environ.get("EMAIL_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_USER", "noreply@silvora.cloud")
