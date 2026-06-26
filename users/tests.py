@@ -232,7 +232,7 @@ class EmailVerificationTests(APITestCase):
     def test_invalid_token_rejected_without_crashing(self):
         res = self.client.get(self._verify_url("not-a-real-token"))
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("error", res.json())
+        self.assertContains(res, "Invalid link", status_code=status.HTTP_400_BAD_REQUEST)
 
     def test_resend_sends_a_second_email_when_unverified(self):
         self.client.post(self.REGISTER, {"email": "resend1@example.com", "password": self.PW}, format="json")
