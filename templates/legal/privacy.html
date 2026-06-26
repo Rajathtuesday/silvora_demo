@@ -123,7 +123,7 @@
     <span class="brand-name">Silvora</span>
   </div>
   <h1>Privacy Policy</h1>
-  <div class="updated">Last updated: 15 June 2026</div>
+  <div class="updated">Last updated: 26 June 2026</div>
 
   <div class="card beta">
     <strong>Beta software.</strong> Silvora is currently in a closed/limited beta.
@@ -224,15 +224,48 @@
 
   <h2>Infrastructure &amp; third parties</h2>
   <p>Silvora runs on a small set of infrastructure providers, each of which only
-    ever sees encrypted data (where applicable):</p>
+    ever sees encrypted data where applicable:</p>
   <ul>
     <li><strong>Render</strong> — hosts the backend application server.</li>
     <li><strong>Neon (PostgreSQL)</strong> — hosts the database (account records,
       encrypted key envelopes, file metadata).</li>
     <li><strong>Cloudflare R2</strong> — stores encrypted file blobs.</li>
+    <li><strong>Razorpay</strong> — processes subscription payments if you
+      upgrade to a paid plan. Razorpay sees your payment details directly;
+      Silvora never receives or stores your card/UPI information.</li>
+    <li><strong>Gmail (Google)</strong> — sends account emails (e.g. email
+      verification). Your email address passes through Google's servers
+      to deliver these.</li>
   </ul>
   <p>We do not sell your data, and we do not share it with advertisers. We do not
     run analytics or tracking SDKs inside the app.</p>
+
+  <h2>Your rights over your data</h2>
+  <p>Regardless of where you live, you have the following rights over your
+    account data. EU/UK residents have these rights under GDPR; we extend the
+    same rights to everyone, not just where legally required:</p>
+  <ul>
+    <li><strong>Right to access</strong> — use <strong>Settings → Export My
+      Data</strong> in the app to download everything tied to your account:
+      every file (decrypted locally, on your device, the same way normal
+      downloads work) plus your account profile and usage info as a single
+      file.</li>
+    <li><strong>Right to erasure</strong> — <strong>Settings → Delete
+      Account</strong> permanently and immediately removes your files,
+      encryption key envelopes, and account record. See "Data retention &amp;
+      deletion" below.</li>
+    <li><strong>Right to rectification</strong> — applies to account-level
+      info like your email address, not file contents — we have no way to
+      "correct" data we cannot read in the first place.</li>
+    <li><strong>Right to portability</strong> — the same export above gives
+      you your data in a form you can move elsewhere; nothing is locked into
+      a proprietary format beyond standard encryption you hold the key to.</li>
+    <li><strong>Right to object / restrict processing</strong> — contact us
+      (below) and we'll act on this manually; Silvora's automated processing
+      is limited to storage, quota enforcement, and billing.</li>
+  </ul>
+  <p>To exercise any of these, use the in-app controls above or email us at
+    the address in "Contact" below.</p>
 
   <h2>Data retention &amp; deletion</h2>
   <ul>
@@ -247,8 +280,9 @@
   </ul>
 
   <h2>Children's privacy</h2>
-  <p>Silvora is not directed at children under 13, and we do not knowingly collect
-    information from children under 13.</p>
+  <p>Silvora is not directed at children, and we do not knowingly collect
+    information from anyone under 13 (or under 16 where local law, including
+    GDPR, sets a higher age for consent without a parent or guardian).</p>
 
   <h2>Changes to this policy</h2>
   <p>We may update this policy as Silvora moves from beta toward general
