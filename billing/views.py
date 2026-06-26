@@ -4,12 +4,13 @@ import logging
 import requests
 from django.conf import settings
 from django.core.mail import send_mail
-from datetime import datetime, timezone as dt_timezone
+from django.utils import timezone
+from datetime import datetime, timedelta, timezone as dt_timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 
-from users.models import SubscriptionTier, UserQuota
+from users.models import UserQuota
 from .models import RazorpayPlan, Subscription
 from .serializers import CreateSubscriptionSerializer
 from .services.razorpay_client import create_subscription, verify_webhook_signature
@@ -138,8 +139,39 @@ class RazorpaySubscriptionWebhookView(APIView):
                     logger.error("Failed to send payment-failed notice to user %s: %s", user.id, e)
 
         elif event in ("subscription.cancelled", "subscription.completed"):
+            # Deliberately NOT downgrading immediately. The user keeps their
+            # paid limit for 7 days (real time to download anything over the
+            # free tier), then gets downgraded to Free, then gets a further
+            # 23 days before any file actually gets deleted. See
+            # process_subscription_grace_periods for the steps that act on
+            # these two dates.
+            now = timezone.now()
             subscription.status = "cancelled" if event == "subscription.cancelled" else "completed"
-            subscription.save(update_fields=["status"])
-            quota.set_tier(SubscriptionTier.FREE)
+            subscription.grace_ends_at = now + timedelta(days=7)
+            subscription.purge_at = now + timedelta(days=30)
+            subscription.save(update_fields=["status", "grace_ends_at", "purge_at"])
+
+            user = subscription.user
+            if user.email:
+                try:
+                    send_mail(
+                        subject="Your Silvora subscription has ended",
+                        message=(
+                            "Your Silvora subscription has ended. You'll keep your current "
+                            "storage limit for 7 more days — plenty of time to download "
+                            "anything over the free 1GB tier, or to resubscribe.\n\n"
+                            "After 7 days, your account moves to the free 1GB tier (your "
+                            "files stay put, you just can't add more until you're back "
+                            "under the limit). Files still over the limit after 30 days "
+                            "total get permanently deleted.\n\n"
+                            "Resubscribe any time before then to keep everything exactly "
+                            "as it is."
+                        ),
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[user.email],
+                        fail_silently=True,
+                    )
+                except Exception as e:
+                    logger.error("Failed to send cancellation notice to user %s: %s", user.id, e)
 
         return Response({"ok": True})

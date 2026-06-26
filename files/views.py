@@ -159,11 +159,31 @@ def restore_file(request, file_id):
 @permission_classes([IsAuthenticated])
 def get_storage_quota(request):
     quota = QuotaService.get_or_create_user_quota(request.user)
-    return Response({
+
+    data = {
         "used_bytes": quota.used_bytes,
         "limit_bytes": quota.limit_bytes,
         "tier": quota.tier,
-    })
+    }
+
+    # Surface an in-progress cancellation grace period, if any, so the app
+    # can show a countdown warning. Cleared automatically once
+    # process_subscription_grace_periods acts on it (grace_ends_at/purge_at
+    # both go back to null), so this naturally disappears on its own.
+    from django.db.models import Q
+    from billing.models import Subscription
+    pending = (
+        Subscription.objects
+        .filter(user=request.user, status="cancelled")
+        .filter(Q(grace_ends_at__isnull=False) | Q(purge_at__isnull=False))
+        .order_by("-created_at")
+        .first()
+    )
+    if pending:
+        data["grace_ends_at"] = pending.grace_ends_at
+        data["purge_at"] = pending.purge_at
+
+    return Response(data)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

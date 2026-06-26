@@ -117,6 +117,32 @@ class FileAPITests(APITestCase):
         self.assertEqual(res.json()["used_bytes"], 200)
         self.assertEqual(res.json()["limit_bytes"], limit)
 
+    def test_quota_surfaces_pending_grace_period(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from billing.models import RazorpayPlan, Subscription
+
+        plan = RazorpayPlan.objects.create(
+            tier=SubscriptionTier.PRO, interval=RazorpayPlan.Interval.MONTHLY,
+            razorpay_plan_id="plan_quota_test", amount_paise=19900,
+        )
+        Subscription.objects.create(
+            user=self.user, plan=plan, razorpay_subscription_id="sub_quota_test",
+            status="cancelled",
+            grace_ends_at=timezone.now() + timedelta(days=3),
+            purge_at=timezone.now() + timedelta(days=26),
+        )
+
+        res = self.client.get("/quota/")
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNotNone(res.json()["grace_ends_at"])
+        self.assertIsNotNone(res.json()["purge_at"])
+
+    def test_quota_omits_grace_period_when_not_cancelled(self):
+        res = self.client.get("/quota/")
+        self.assertEqual(res.status_code, 200)
+        self.assertNotIn("grace_ends_at", res.json())
+
     def test_delete_and_restore_file_flow(self):
         file = FileRecord.objects.create(
             id=uuid.uuid4(),

@@ -2,15 +2,21 @@
 import hashlib
 import hmac
 import json
+import uuid
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.cache import cache
-from django.test import override_settings
+from django.core.management import call_command
+from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APITestCase
 from rest_framework import status
 
+from tenants.models import Tenant
+from files.models import FileRecord
 from users.models import SubscriptionTier, UserQuota
 from .models import RazorpayPlan, Subscription
 
@@ -139,17 +145,27 @@ class RazorpaySubscriptionWebhookTests(APITestCase):
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.current_period_end.timestamp(), 1896134400)
 
-    def test_cancelled_event_downgrades_to_free(self):
+    def test_cancelled_event_does_not_downgrade_immediately(self):
+        """Cancellation starts a 7-day grace period instead of downgrading
+        on the spot — the user keeps their paid limit until that elapses
+        (see process_subscription_grace_periods for what actually acts on
+        grace_ends_at/purge_at)."""
         self._post_webhook("subscription.activated", current_end=1893456000)
+        mail.outbox = []
         res = self._post_webhook("subscription.cancelled")
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.subscription.refresh_from_db()
         self.assertEqual(self.subscription.status, "cancelled")
+        self.assertIsNotNone(self.subscription.grace_ends_at)
+        self.assertIsNotNone(self.subscription.purge_at)
+        self.assertGreater(self.subscription.purge_at, self.subscription.grace_ends_at)
 
         quota = UserQuota.objects.get(user=self.user)
-        self.assertEqual(quota.tier, SubscriptionTier.FREE)
-        self.assertEqual(quota.limit_bytes, 1 * 1024 * 1024 * 1024)
+        self.assertEqual(quota.tier, SubscriptionTier.PRO)  # not downgraded yet
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("webhookuser@example.com", mail.outbox[0].to)
 
     def test_payment_failed_sends_notice_without_downgrading(self):
         self._post_webhook("subscription.activated", current_end=1893456000)
@@ -170,3 +186,123 @@ class RazorpaySubscriptionWebhookTests(APITestCase):
 
         quota = UserQuota.objects.get(user=self.user)
         self.assertEqual(quota.tier, SubscriptionTier.PRO)  # same end state, not doubled
+
+
+GiB = 1024 * 1024 * 1024
+
+
+class ProcessSubscriptionGracePeriodsTests(TestCase):
+    """The daily cron command — see process_subscription_grace_periods.py.
+    Cancellation itself (tested above) only schedules these two dates;
+    this command is what actually acts on them."""
+
+    def setUp(self):
+        mail.outbox = []
+        self.tenant = Tenant.objects.create(name="grace_tenant", tenant_type=Tenant.TYPE_INDIVIDUAL)
+        self.user = User.objects.create_user(
+            username="grace@example.com", email="grace@example.com",
+            password="x", tenant=self.tenant,
+        )
+        self.plan = RazorpayPlan.objects.create(
+            tier=SubscriptionTier.PRO, interval=RazorpayPlan.Interval.MONTHLY,
+            razorpay_plan_id="plan_grace", amount_paise=19900,
+        )
+        self.quota = UserQuota.objects.create(user=self.user, tier=SubscriptionTier.PRO, limit_bytes=100 * GiB)
+
+    def _make_subscription(self, status="cancelled", grace_ends_at=None, purge_at=None):
+        return Subscription.objects.create(
+            user=self.user, plan=self.plan,
+            razorpay_subscription_id=f"sub_{uuid.uuid4().hex[:12]}",
+            status=status, grace_ends_at=grace_ends_at, purge_at=purge_at,
+        )
+
+    def _make_file(self, size, created_at):
+        f = FileRecord.objects.create(
+            id=uuid.uuid4(), owner=self.user, tenant=self.tenant,
+            filename_ciphertext=b"x", filename_nonce=b"x", filename_mac=b"x",
+            size=size, security_mode="zero_knowledge",
+            storage_type=FileRecord.STORAGE_R2, upload_state=FileRecord.UploadState.COMMITTED,
+        )
+        # created_at is auto_now_add — backdate it directly for ordering tests.
+        FileRecord.objects.filter(pk=f.pk).update(created_at=created_at)
+        return f
+
+    def test_downgrades_once_grace_period_has_elapsed(self):
+        sub = self._make_subscription(grace_ends_at=timezone.now() - timedelta(hours=1))
+
+        call_command("process_subscription_grace_periods")
+
+        self.quota.refresh_from_db()
+        self.assertEqual(self.quota.tier, SubscriptionTier.FREE)
+        self.assertEqual(self.quota.limit_bytes, 1 * GiB)
+        sub.refresh_from_db()
+        self.assertIsNone(sub.grace_ends_at)  # cleared so it never re-fires
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("grace@example.com", mail.outbox[0].to)
+
+    def test_grace_period_still_in_the_future_is_left_alone(self):
+        sub = self._make_subscription(grace_ends_at=timezone.now() + timedelta(days=3))
+
+        call_command("process_subscription_grace_periods")
+
+        self.quota.refresh_from_db()
+        self.assertEqual(self.quota.tier, SubscriptionTier.PRO)  # untouched
+        sub.refresh_from_db()
+        self.assertIsNotNone(sub.grace_ends_at)  # not yet acted on
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_downgrade_skipped_if_user_already_resubscribed(self):
+        sub = self._make_subscription(grace_ends_at=timezone.now() - timedelta(hours=1))
+        self._make_subscription(status="active")  # the resubscription
+
+        call_command("process_subscription_grace_periods")
+
+        self.quota.refresh_from_db()
+        self.assertEqual(self.quota.tier, SubscriptionTier.PRO)  # NOT downgraded
+        sub.refresh_from_db()
+        self.assertIsNone(sub.grace_ends_at)  # still cleared, so it doesn't keep re-checking
+
+    @patch("billing.management.commands.process_subscription_grace_periods.StorageGateway")
+    def test_purge_deletes_oldest_files_first_down_to_the_limit(self, mock_storage_cls):
+        mock_storage = mock_storage_cls.return_value
+        self.quota.tier = SubscriptionTier.FREE
+        self.quota.limit_bytes = 1 * GiB
+        self.quota.used_bytes = int(1.5 * GiB)
+        self.quota.save()
+
+        now = timezone.now()
+        oldest = self._make_file(size=int(0.6 * GiB), created_at=now - timedelta(days=10))
+        middle = self._make_file(size=int(0.6 * GiB), created_at=now - timedelta(days=5))
+        newest = self._make_file(size=int(0.3 * GiB), created_at=now - timedelta(days=1))
+        sub = self._make_subscription(status="cancelled", purge_at=now - timedelta(hours=1))
+
+        call_command("process_subscription_grace_periods")
+
+        # Oldest deleted first; stop as soon as we're back under the limit.
+        self.assertFalse(FileRecord.objects.filter(pk=oldest.pk).exists())
+        self.assertTrue(FileRecord.objects.filter(pk=middle.pk).exists())
+        self.assertTrue(FileRecord.objects.filter(pk=newest.pk).exists())
+        mock_storage.delete_recursive.assert_called_once()
+
+        self.quota.refresh_from_db()
+        self.assertEqual(self.quota.used_bytes, int(1.5 * GiB) - int(0.6 * GiB))  # the oldest file's size released
+
+        sub.refresh_from_db()
+        self.assertIsNone(sub.purge_at)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("removed", mail.outbox[0].subject.lower())
+
+    @patch("billing.management.commands.process_subscription_grace_periods.StorageGateway")
+    def test_purge_is_a_noop_if_already_under_the_limit(self, mock_storage_cls):
+        self.quota.tier = SubscriptionTier.FREE
+        self.quota.limit_bytes = 1 * GiB
+        self.quota.used_bytes = int(0.5 * GiB)
+        self.quota.save()
+        self._make_file(size=int(0.5 * GiB), created_at=timezone.now() - timedelta(days=10))
+        self._make_subscription(status="cancelled", purge_at=timezone.now() - timedelta(hours=1))
+
+        call_command("process_subscription_grace_periods")
+
+        self.assertEqual(FileRecord.objects.count(), 1)  # nothing deleted
+        mock_storage_cls.return_value.delete_recursive.assert_not_called()
+        self.assertEqual(len(mail.outbox), 0)  # no "files removed" email for a no-op

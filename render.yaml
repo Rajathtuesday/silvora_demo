@@ -30,3 +30,37 @@ services:
         sync: false
       - key: R2_SECRET_ACCESS_KEY
         sync: false
+
+  # Runs once a day: downgrades accounts whose 7-day cancellation grace
+  # period elapsed, and permanently deletes files still over the Free
+  # limit 30 days after cancellation. See billing/management/commands/
+  # process_subscription_grace_periods.py for the actual logic.
+  - type: cron
+    name: silvora-grace-period-check
+    runtime: python
+    plan: free
+    schedule: "0 3 * * *"  # 03:00 UTC daily — low-traffic hours
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python manage.py process_subscription_grace_periods"
+    envVars:
+      - fromService:
+          type: web
+          name: silvora-backend
+          envVarKey: DJANGO_SECRET_KEY
+        key: DJANGO_SECRET_KEY
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASSWORD
+        sync: false
