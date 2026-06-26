@@ -2,6 +2,7 @@
 import logging
 
 from django.core.signing import BadSignature, SignatureExpired
+from django.shortcuts import render
 from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -47,31 +48,45 @@ class RegisterView(APIView):
 
 class VerifyEmailView(APIView):
     """Public — the token itself is the credential. Non-blocking design:
-    this just flips a flag, it never gates login or vault access."""
+    this just flips a flag, it never gates login or vault access.
+
+    Renders an HTML page rather than a DRF Response — this link is opened
+    directly in a phone's browser from the verification email, so the
+    person on the other end needs something readable, not raw JSON.
+    """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, token):
         try:
             user_id = unsign_verification_token(token)
         except SignatureExpired:
-            return Response(
-                {"error": "This verification link has expired. Request a new one from the app."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return render(request, "users/verify_email_result.html", {
+                "success": False,
+                "heading": "Link expired",
+                "message": "This verification link has expired. Open the Silvora app and request a new one.",
+            }, status=400)
         except BadSignature:
-            return Response({"error": "Invalid verification link."}, status=status.HTTP_400_BAD_REQUEST)
+            return render(request, "users/verify_email_result.html", {
+                "success": False,
+                "heading": "Invalid link",
+                "message": "This verification link isn't valid. Open the Silvora app and request a new one.",
+            }, status=400)
 
         try:
             user = User.objects.get(id=user_id)
         except User.DoesNotExist:
-            return Response({"error": "Invalid verification link."}, status=status.HTTP_400_BAD_REQUEST)
+            return render(request, "users/verify_email_result.html", {
+                "success": False,
+                "heading": "Invalid link",
+                "message": "This verification link isn't valid. Open the Silvora app and request a new one.",
+            }, status=400)
 
         if not user.email_verified:
             user.email_verified = True
             user.email_verified_at = timezone.now()
             user.save(update_fields=["email_verified", "email_verified_at"])
 
-        return Response({"status": "email_verified"})
+        return render(request, "users/verify_email_result.html", {"success": True})
 
 
 class MeView(APIView):
