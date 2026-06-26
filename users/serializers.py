@@ -1,7 +1,9 @@
 # users/serializers.py
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.hashers import make_password
+from django.utils import timezone
 from rest_framework import serializers
 
 from .models import MasterKeyEnvelope
@@ -24,10 +26,17 @@ def _from_hex(value, field, exact_len=None, min_len=None):
 # ============================ REGISTER ============================
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=12)
+    # Required, not just recorded -- GDPR Article 7 / Recital 32 call for a
+    # clear affirmative action, so the server rejects registration outright
+    # if this isn't explicitly true rather than trusting a client-side-only
+    # checkbox. This is the one deliberate exception to the rest of this
+    # app's non-blocking philosophy: consent is a single click fully in the
+    # user's own control, unlike email deliverability.
+    accepted_privacy_policy = serializers.BooleanField(write_only=True)
 
     class Meta:
         model = User
-        fields = ("id", "email", "password")
+        fields = ("id", "email", "password", "accepted_privacy_policy")
 
     def validate_email(self, value):
         email = value.strip().lower()
@@ -39,10 +48,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         validate_password(value)
         return value
 
+    def validate_accepted_privacy_policy(self, value):
+        if not value:
+            raise serializers.ValidationError("You must accept the Privacy Policy to register.")
+        return value
+
     def create(self, validated_data):
         email = validated_data["email"]
         return User.objects.create_user(
-            username=email, email=email, password=validated_data["password"]
+            username=email, email=email, password=validated_data["password"],
+            privacy_policy_accepted_at=timezone.now(),
+            privacy_policy_version=settings.PRIVACY_POLICY_VERSION,
         )
 
 

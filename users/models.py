@@ -24,6 +24,15 @@ class User(AbstractUser):
     email_verified = models.BooleanField(default=False)
     email_verified_at = models.DateTimeField(null=True, blank=True)
 
+    # Consent record for GDPR Article 7 — must be demonstrable later, hence
+    # storing *when* and *which version* of the policy was agreed to, not
+    # just a boolean. Required at registration (see RegisterSerializer);
+    # this is a deliberate exception to the app's general non-blocking
+    # philosophy, since consent is a one-click action fully in the user's
+    # own control, unlike email deliverability.
+    privacy_policy_accepted_at = models.DateTimeField(null=True, blank=True)
+    privacy_policy_version = models.CharField(max_length=20, null=True, blank=True)
+
     def __str__(self):
         return self.email or self.username
 
