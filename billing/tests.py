@@ -36,7 +36,7 @@ class CreateSubscriptionViewTests(APITestCase):
     def setUp(self):
         cache.clear()
         self.email = "subscriber@example.com"
-        self.client.post("/api/auth/register/", {"email": self.email, "password": PW}, format="json")
+        self.client.post("/api/auth/register/", {"email": self.email, "password": PW, "accepted_privacy_policy": True}, format="json")
         cache.clear()
         res = self.client.post("/api/auth/token/", {"username": self.email, "password": PW}, format="json")
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.json()['access']}")

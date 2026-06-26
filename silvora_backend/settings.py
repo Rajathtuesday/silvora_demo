@@ -263,6 +263,11 @@ DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_USER", "noreply@silvora.cloud")
 # this keeps the link host correct in dev vs prod without guessing from env).
 SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://app.silvora.cloud")
 
+# Bump this string whenever the privacy policy materially changes — stored
+# on each user at registration (privacy_policy_version) so old acceptances
+# stay tied to the version they actually agreed to, not silently relabeled.
+PRIVACY_POLICY_VERSION = "2026-06-26"
+
 # =====================================================
 # 💳 RAZORPAY (subscription billing — Silvora's own account,
 # separate from any restaurant customer's Razorpay credentials elsewhere)
