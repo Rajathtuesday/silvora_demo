@@ -151,6 +151,38 @@ def restore_file(request, file_id):
         file.restore_record()
     return Response({"status": "restored"})
 
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def rename_file(request, file_id):
+    """
+    Stores a new encrypted filename. The server never sees the plaintext
+    name — the client decrypts the old one, lets the user edit it, then
+    re-encrypts under the same per-file key (derived from file_id, same as
+    at upload time) and sends the new ciphertext/nonce/mac, same shape as
+    start_upload. The server's job is just to swap these three fields.
+    """
+    file = get_object_or_404(
+        FileRecord, id=file_id, owner=request.user, tenant=request.user.tenant,
+    )
+
+    cipher_hex = request.data.get("filename_ciphertext")
+    nonce_hex = request.data.get("filename_nonce")
+    mac_hex = request.data.get("filename_mac")
+    if not cipher_hex or not nonce_hex or not mac_hex:
+        return Response({"error": "Filename metadata required"}, status=400)
+
+    try:
+        file.filename_ciphertext = bytes.fromhex(cipher_hex)
+        file.filename_nonce = bytes.fromhex(nonce_hex)
+        file.filename_mac = bytes.fromhex(mac_hex)
+    except ValueError:
+        return Response({"error": "Invalid filename metadata"}, status=400)
+
+    file.save(update_fields=["filename_ciphertext", "filename_nonce", "filename_mac"])
+    return Response({"status": "renamed"})
+
+
 # ============================================================
 # DOWNLOADS & QUOTA
 # ============================================================

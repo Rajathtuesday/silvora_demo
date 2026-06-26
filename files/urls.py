@@ -19,6 +19,7 @@ urlpatterns = [
     path("file/<uuid:file_id>/delete/", views.delete_file),
     path("trash/", views.list_trash),
     path("file/<uuid:file_id>/restore/", views.restore_file),
+    path("file/<uuid:file_id>/rename/", views.rename_file),
     
     # #download
     # path("file/<uuid:file_id>/download/", views.download_file),

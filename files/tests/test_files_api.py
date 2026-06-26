@@ -143,6 +143,54 @@ class FileAPITests(APITestCase):
         self.assertEqual(res.status_code, 200)
         self.assertNotIn("grace_ends_at", res.json())
 
+    def test_rename_updates_the_encrypted_filename_fields(self):
+        file = FileRecord.objects.create(
+            id=uuid.uuid4(), owner=self.user, tenant=self.user.tenant,
+            filename_ciphertext=b"old-cipher", filename_nonce=b"old-nonce", filename_mac=b"old-mac",
+            size=10, security_mode="zero_knowledge",
+            storage_type=FileRecord.STORAGE_R2, upload_state=FileRecord.UploadState.COMMITTED,
+        )
+
+        res = self.client.post(f"/file/{file.id}/rename/", {
+            "filename_ciphertext": "abcd1234",
+            "filename_nonce": "ef567890",
+            "filename_mac": "12ab34cd",
+        }, format="json")
+
+        self.assertEqual(res.status_code, 200)
+        file.refresh_from_db()
+        self.assertEqual(file.filename_ciphertext, bytes.fromhex("abcd1234"))
+        self.assertEqual(file.filename_nonce, bytes.fromhex("ef567890"))
+        self.assertEqual(file.filename_mac, bytes.fromhex("12ab34cd"))
+
+    def test_rename_rejects_someone_elses_file(self):
+        other_tenant = Tenant.objects.create(name="other_tenant", tenant_type=Tenant.TYPE_INDIVIDUAL)
+        other_user = User.objects.create_user(username="otheruser", password="x", tenant=other_tenant)
+        file = FileRecord.objects.create(
+            id=uuid.uuid4(), owner=other_user, tenant=other_tenant,
+            filename_ciphertext=b"a", filename_nonce=b"b", filename_mac=b"c",
+            size=10, security_mode="zero_knowledge",
+            storage_type=FileRecord.STORAGE_R2, upload_state=FileRecord.UploadState.COMMITTED,
+        )
+
+        res = self.client.post(f"/file/{file.id}/rename/", {
+            "filename_ciphertext": "aa", "filename_nonce": "bb", "filename_mac": "cc",
+        }, format="json")
+        self.assertEqual(res.status_code, 404)
+
+    def test_rename_rejects_malformed_hex(self):
+        file = FileRecord.objects.create(
+            id=uuid.uuid4(), owner=self.user, tenant=self.user.tenant,
+            filename_ciphertext=b"a", filename_nonce=b"b", filename_mac=b"c",
+            size=10, security_mode="zero_knowledge",
+            storage_type=FileRecord.STORAGE_R2, upload_state=FileRecord.UploadState.COMMITTED,
+        )
+
+        res = self.client.post(f"/file/{file.id}/rename/", {
+            "filename_ciphertext": "not-hex!!", "filename_nonce": "bb", "filename_mac": "cc",
+        }, format="json")
+        self.assertEqual(res.status_code, 400)
+
     def test_delete_and_restore_file_flow(self):
         file = FileRecord.objects.create(
             id=uuid.uuid4(),
