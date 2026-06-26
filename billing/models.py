@@ -48,5 +48,19 @@ class Subscription(models.Model):
     current_period_end = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Set together when a cancellation/completion webhook lands. Cancelling
+    # does NOT downgrade immediately — the user keeps their paid limit for a
+    # week (time to actually download anything over the free tier), then
+    # gets downgraded, then gets a further 23 days before any file is
+    # actually deleted. Both null means "not in a cancellation flow."
+    grace_ends_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Downgrade to Free happens after this (7 days post-cancellation).",
+    )
+    purge_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Files still over the Free limit get deleted after this (30 days post-cancellation).",
+    )
+
     def __str__(self):
         return f"{self.user} -> {self.plan} [{self.status}]"
