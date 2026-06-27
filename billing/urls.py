@@ -1,9 +1,9 @@
 # billing/urls.py
 from django.urls import path
 
-from .views import CreateSubscriptionView, RazorpaySubscriptionWebhookView
+from .views import RazorpaySubscriptionWebhookView, WebBillingLinkView
 
 urlpatterns = [
-    path("subscribe/", CreateSubscriptionView.as_view()),
+    path("web-link/", WebBillingLinkView.as_view()),
     path("webhook/", RazorpaySubscriptionWebhookView.as_view()),
 ]

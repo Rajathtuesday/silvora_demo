@@ -4,62 +4,95 @@ import logging
 import requests
 from django.conf import settings
 from django.core.mail import send_mail
+from django.core.signing import BadSignature, SignatureExpired
+from django.shortcuts import render
 from django.utils import timezone
 from datetime import datetime, timedelta, timezone as dt_timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
 
-from users.models import UserQuota
+from users.models import User, UserQuota
 from .models import RazorpayPlan, Subscription
 from .serializers import CreateSubscriptionSerializer
-from .services.razorpay_client import create_subscription, verify_webhook_signature
+from .services.razorpay_client import verify_webhook_signature
+from .services.subscription_service import PlanNotConfigured, create_user_subscription
+from .services.web_link import make_billing_web_token, unsign_billing_web_token
 
 logger = logging.getLogger("silvora.billing")
 
 
-class CreateSubscriptionView(APIView):
+class WebBillingLinkView(APIView):
+    """
+    Subscribing happens entirely on silvora.cloud now, not inside the app --
+    Google Play requires in-app digital subscriptions to go through Play
+    Billing, and routing through Razorpay's own checkout on the web instead
+    sidesteps that requirement entirely (same approach most cloud-storage
+    apps use on Android). The app's only job is to ask for a signed link to
+    the right checkout page, already identifying the user, and open it
+    externally.
+    """
     permission_classes = [permissions.IsAuthenticated]
     throttle_scope = "billing"
 
-    def post(self, request):
-        serializer = CreateSubscriptionSerializer(data=request.data)
+    def get(self, request):
+        serializer = CreateSubscriptionSerializer(data=request.query_params)
         serializer.is_valid(raise_exception=True)
         tier = serializer.validated_data["tier"]
         interval = serializer.validated_data["interval"]
 
-        try:
-            plan = RazorpayPlan.objects.get(tier=tier, interval=interval)
-        except RazorpayPlan.DoesNotExist:
-            return Response(
-                {"error": "This plan is not configured yet. Please try again shortly."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        token = make_billing_web_token(request.user)
+        url = f"{settings.SITE_BASE_URL}/billing/checkout/?token={token}&tier={tier}&interval={interval}"
+        return Response({"url": url})
 
-        try:
-            rzp_subscription = create_subscription(plan.razorpay_plan_id)
-        except requests.RequestException as e:
-            logger.error("Razorpay subscription creation failed for user %s: %s", request.user.id, e)
-            return Response(
-                {"error": "Could not reach Razorpay. Please try again."},
-                status=status.HTTP_502_BAD_GATEWAY,
-            )
 
-        subscription = Subscription.objects.create(
-            user=request.user,
-            plan=plan,
-            razorpay_subscription_id=rzp_subscription["id"],
-            status=rzp_subscription.get("status", "created"),
-        )
+def billing_checkout_page(request):
+    """
+    Public page (the token, not a session, is the credential) -- creates the
+    Razorpay subscription server-side and renders Razorpay's web Checkout.js
+    for it. The actual tier upgrade still happens later, via the webhook,
+    independent of this page -- same as the in-app flow always worked.
+    """
+    token = request.GET.get("token", "")
+    tier = request.GET.get("tier", "")
+    interval = request.GET.get("interval", "")
 
-        return Response(
-            {
-                "subscription_id": subscription.razorpay_subscription_id,
-                "razorpay_key_id": settings.RAZORPAY_KEY_ID,
-                "status": subscription.status,
-            },
-            status=status.HTTP_201_CREATED,
-        )
+    try:
+        user_id = unsign_billing_web_token(token)
+    except SignatureExpired:
+        return render(request, "billing/checkout_error.html", {
+            "message": "This link has expired. Go back to the Silvora app and tap Manage Subscription again.",
+        }, status=400)
+    except BadSignature:
+        return render(request, "billing/checkout_error.html", {
+            "message": "This link isn't valid. Go back to the Silvora app and tap Manage Subscription again.",
+        }, status=400)
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return render(request, "billing/checkout_error.html", {
+            "message": "This link isn't valid. Go back to the Silvora app and tap Manage Subscription again.",
+        }, status=400)
+
+    try:
+        subscription = create_user_subscription(user, tier, interval)
+    except PlanNotConfigured:
+        return render(request, "billing/checkout_error.html", {
+            "message": "This plan isn't configured yet. Please try again shortly.",
+        }, status=400)
+    except requests.RequestException as e:
+        logger.error("Razorpay subscription creation failed for user %s: %s", user.id, e)
+        return render(request, "billing/checkout_error.html", {
+            "message": "Couldn't reach Razorpay. Please try again.",
+        }, status=502)
+
+    return render(request, "billing/checkout.html", {
+        "subscription_id": subscription.razorpay_subscription_id,
+        "razorpay_key_id": settings.RAZORPAY_KEY_ID,
+        "tier": tier,
+        "interval": interval,
+    })
 
 
 class RazorpaySubscriptionWebhookView(APIView):

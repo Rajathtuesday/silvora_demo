@@ -23,7 +23,7 @@ from .models import RazorpayPlan, Subscription
 User = get_user_model()
 
 WEBHOOK_SECRET = "test_webhook_secret"
-SUBSCRIBE_URL = "/api/billing/subscribe/"
+WEB_LINK_URL = "/api/billing/web-link/"
 WEBHOOK_URL = "/api/billing/webhook/"
 PW = "Str0ng!Vault#Key2026"
 
@@ -32,7 +32,11 @@ def _sign(body_bytes, secret=WEBHOOK_SECRET):
     return hmac.new(secret.encode(), body_bytes, hashlib.sha256).hexdigest()
 
 
-class CreateSubscriptionViewTests(APITestCase):
+class WebBillingLinkViewTests(APITestCase):
+    """Subscribing happens on the website now, not in-app (Google Play
+    requires in-app digital subscriptions to go through Play Billing) --
+    this endpoint's only job is handing back a signed link to there."""
+
     def setUp(self):
         cache.clear()
         self.email = "subscriber@example.com"
@@ -42,44 +46,74 @@ class CreateSubscriptionViewTests(APITestCase):
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.json()['access']}")
         self.user = User.objects.get(email=self.email)
 
+    def test_requires_authentication(self):
+        self.client.credentials()
+        res = self.client.get(WEB_LINK_URL, {"tier": "pro", "interval": "monthly"})
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_rejects_unknown_tier(self):
+        res = self.client.get(WEB_LINK_URL, {"tier": "godmode", "interval": "monthly"})
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_returns_a_signed_checkout_url(self):
+        res = self.client.get(WEB_LINK_URL, {"tier": "pro", "interval": "monthly"})
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        url = res.json()["url"]
+        self.assertIn("/billing/checkout/?token=", url)
+        self.assertIn("tier=pro", url)
+        self.assertIn("interval=monthly", url)
+        # No Subscription row yet -- creation happens on the checkout page,
+        # not here. This endpoint only ever hands back a link.
+        self.assertEqual(Subscription.objects.count(), 0)
+
+
+class BillingCheckoutPageTests(TestCase):
+    """The actual Razorpay subscription gets created here, when the signed
+    link is opened -- not when the app asked for the link."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            username="checkout@example.com", email="checkout@example.com", password=PW,
+        )
         self.plan = RazorpayPlan.objects.create(
             tier=SubscriptionTier.PRO, interval=RazorpayPlan.Interval.MONTHLY,
             razorpay_plan_id="plan_test123", amount_paise=19900,
         )
 
-    def test_requires_authentication(self):
-        self.client.credentials()
-        res = self.client.post(SUBSCRIBE_URL, {"tier": "pro", "interval": "monthly"}, format="json")
-        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+    def _token(self):
+        from .services.web_link import make_billing_web_token
+        return make_billing_web_token(self.user)
 
-    def test_rejects_unknown_tier(self):
-        res = self.client.post(SUBSCRIBE_URL, {"tier": "godmode", "interval": "monthly"}, format="json")
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+    def test_invalid_token_rejected(self):
+        res = self.client.get("/billing/checkout/", {"token": "garbage", "tier": "pro", "interval": "monthly"})
+        self.assertEqual(res.status_code, 400)
 
-    def test_rejects_a_tier_with_no_configured_plan(self):
-        res = self.client.post(SUBSCRIBE_URL, {"tier": "enterprise", "interval": "yearly"}, format="json")
-        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+    def test_unconfigured_plan_shows_clean_error(self):
+        res = self.client.get("/billing/checkout/", {"token": self._token(), "tier": "enterprise", "interval": "yearly"})
+        self.assertEqual(res.status_code, 400)
+        self.assertContains(res, "configured yet", status_code=400)
 
-    @patch("billing.views.create_subscription")
-    def test_creates_a_local_subscription_row(self, mock_create):
+    @patch("billing.services.subscription_service.create_subscription")
+    def test_valid_token_creates_subscription_and_renders_checkout(self, mock_create):
         mock_create.return_value = {"id": "sub_test456", "status": "created"}
 
-        res = self.client.post(SUBSCRIBE_URL, {"tier": "pro", "interval": "monthly"}, format="json")
+        res = self.client.get("/billing/checkout/", {"token": self._token(), "tier": "pro", "interval": "monthly"})
 
-        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res.json()["subscription_id"], "sub_test456")
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "sub_test456")
         sub = Subscription.objects.get(razorpay_subscription_id="sub_test456")
         self.assertEqual(sub.user, self.user)
         self.assertEqual(sub.plan, self.plan)
 
-    @patch("billing.views.create_subscription")
-    def test_razorpay_failure_returns_clean_error_not_a_500(self, mock_create):
+    @patch("billing.services.subscription_service.create_subscription")
+    def test_razorpay_failure_shows_clean_error_not_a_500(self, mock_create):
         import requests
         mock_create.side_effect = requests.RequestException("boom")
 
-        res = self.client.post(SUBSCRIBE_URL, {"tier": "pro", "interval": "monthly"}, format="json")
+        res = self.client.get("/billing/checkout/", {"token": self._token(), "tier": "pro", "interval": "monthly"})
 
-        self.assertEqual(res.status_code, status.HTTP_502_BAD_GATEWAY)
+        self.assertEqual(res.status_code, 502)
         self.assertEqual(Subscription.objects.count(), 0)
 
 
