@@ -58,6 +58,39 @@ class RegistrationSecurityTests(APITestCase):
         self.assertEqual(User.objects.filter(email="dup@example.com").count(), 1)
 
 
+class LoginCaseInsensitivityTests(APITestCase):
+    """Registration lowercases the email (RegisterSerializer.validate_email);
+    login must match the same normalisation, or anyone who registers as
+    Tuesday@gmail.com and later types it the same way can't log back in."""
+
+    TOKEN = "/api/auth/token/"
+
+    def setUp(self):
+        cache.clear()
+        User.objects.create_user(
+            username="casefold@example.com", email="casefold@example.com",
+            password="Str0ng!Vault#Key2026",
+        )
+
+    def test_login_with_different_case_succeeds(self):
+        res = self.client.post(
+            self.TOKEN, {"username": "CaseFold@Example.com", "password": "Str0ng!Vault#Key2026"}, format="json"
+        )
+        self.assertEqual(res.status_code, 200)
+
+    def test_login_with_original_lowercase_still_works(self):
+        res = self.client.post(
+            self.TOKEN, {"username": "casefold@example.com", "password": "Str0ng!Vault#Key2026"}, format="json"
+        )
+        self.assertEqual(res.status_code, 200)
+
+    def test_wrong_password_still_rejected_regardless_of_case(self):
+        res = self.client.post(
+            self.TOKEN, {"username": "CASEFOLD@EXAMPLE.COM", "password": "wrong"}, format="json"
+        )
+        self.assertEqual(res.status_code, 401)
+
+
 class PrivacyPolicyConsentTests(APITestCase):
     """Required, not just recorded -- see RegisterSerializer.validate_accepted_privacy_policy."""
 
@@ -119,6 +152,54 @@ class RateLimitTests(APITestCase):
         )
         # And at least some legitimate registrations succeeded before the limit
         self.assertIn(status.HTTP_201_CREATED, statuses)
+
+
+class KdfParameterValidationTests(APITestCase):
+    """The server never runs Argon2 itself, but it stores these parameters
+    and hands them back to the client on every future unlock -- a weak
+    value here means the server faithfully replays a trivially
+    brute-forceable KDF forever after. See MasterKeySetupSerializer."""
+
+    REGISTER = "/api/auth/register/"
+    SETUP = "/api/auth/master-key/setup/"
+    TOKEN = "/api/auth/token/"
+    PW = "Str0ng!Vault#Key2026"
+
+    BASE_ENV = {
+        "enc_master_key": "ab" * 48,
+        "enc_master_key_nonce": "cd" * 24,
+        "kdf_salt": "ef" * 16,
+    }
+
+    def setUp(self):
+        cache.clear()
+        self.email = "kdftest@example.com"
+        self.client.post(self.REGISTER, {"email": self.email, "password": self.PW, "accepted_privacy_policy": True}, format="json")
+        cache.clear()
+        res = self.client.post(self.TOKEN, {"username": self.email, "password": self.PW}, format="json")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.json()['access']}")
+
+    def _setup(self, memory_kb=65536, iterations=3, parallelism=1):
+        return self.client.post(self.SETUP, {
+            **self.BASE_ENV,
+            "kdf_memory_kb": memory_kb, "kdf_iterations": iterations, "kdf_parallelism": parallelism,
+        }, format="json")
+
+    def test_normal_parameters_accepted(self):
+        res = self._setup()
+        self.assertEqual(res.status_code, 201, res.content)
+
+    def test_near_zero_memory_rejected(self):
+        res = self._setup(memory_kb=1)
+        self.assertEqual(res.status_code, 400)
+
+    def test_near_zero_iterations_rejected(self):
+        res = self._setup(iterations=1)
+        self.assertEqual(res.status_code, 400)
+
+    def test_excessive_parallelism_rejected(self):
+        res = self._setup(parallelism=999)
+        self.assertEqual(res.status_code, 400)
 
 
 class RecoveryFlowTests(APITestCase):

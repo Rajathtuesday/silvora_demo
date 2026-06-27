@@ -5,10 +5,25 @@ from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.hashers import make_password
 from django.utils import timezone
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import MasterKeyEnvelope
 
 User = get_user_model()
+
+
+class LowercaseTokenObtainPairSerializer(TokenObtainPairSerializer):
+    """Registration lowercases the email before storing it (validate_email
+    below), but Django's default auth backend matches the username field
+    case-sensitively -- so Tuesday@gmail.com registers as tuesday@gmail.com
+    and then can't log back in typing it the way they originally typed it.
+    Normalise the same way on the way in, not just on the way out."""
+
+    def validate(self, attrs):
+        value = attrs.get(self.username_field)
+        if isinstance(value, str):
+            attrs[self.username_field] = value.strip().lower()
+        return super().validate(attrs)
 
 
 def _from_hex(value, field, exact_len=None, min_len=None):
@@ -101,23 +116,33 @@ class RecoveryMetaSerializer(serializers.ModelSerializer):
     def get_recovery_kdf_salt_hex(self, obj): return obj.recovery_kdf_salt.hex()
 
 
+# The server never runs Argon2 itself, but it stores these parameters and
+# hands them back to the client on every future unlock -- so a client that
+# sends an effectively-free set of parameters (memory_kb=1, iterations=1)
+# would have the server faithfully replaying a trivially brute-forceable
+# KDF forever after. Floors here, not just type checks.
+_KDF_MEMORY_KB = dict(min_value=65536)   # 64MB minimum
+_KDF_ITERATIONS = dict(min_value=3)
+_KDF_PARALLELISM = dict(min_value=1, max_value=8)
+
+
 # ========================= MASTER KEY SETUP ======================
 class MasterKeySetupSerializer(serializers.Serializer):
     # Password-wrapped envelope (required)
     enc_master_key = serializers.CharField()
     enc_master_key_nonce = serializers.CharField()
     kdf_salt = serializers.CharField()
-    kdf_memory_kb = serializers.IntegerField()
-    kdf_iterations = serializers.IntegerField()
-    kdf_parallelism = serializers.IntegerField()
+    kdf_memory_kb = serializers.IntegerField(**_KDF_MEMORY_KB)
+    kdf_iterations = serializers.IntegerField(**_KDF_ITERATIONS)
+    kdf_parallelism = serializers.IntegerField(**_KDF_PARALLELISM)
 
     # Recovery-wrapped envelope (optional, for backward-compat with old clients)
     enc_master_key_recovery = serializers.CharField(required=False)
     enc_master_key_recovery_nonce = serializers.CharField(required=False)
     recovery_kdf_salt = serializers.CharField(required=False)
-    recovery_kdf_memory_kb = serializers.IntegerField(required=False)
-    recovery_kdf_iterations = serializers.IntegerField(required=False)
-    recovery_kdf_parallelism = serializers.IntegerField(required=False)
+    recovery_kdf_memory_kb = serializers.IntegerField(required=False, **_KDF_MEMORY_KB)
+    recovery_kdf_iterations = serializers.IntegerField(required=False, **_KDF_ITERATIONS)
+    recovery_kdf_parallelism = serializers.IntegerField(required=False, **_KDF_PARALLELISM)
     recovery_auth_key = serializers.CharField(required=False)  # raw; stored hashed
 
     def validate_enc_master_key(self, v): return _from_hex(v, "enc_master_key", min_len=48)
@@ -141,9 +166,9 @@ class _NewPasswordEnvelope(serializers.Serializer):
     enc_master_key = serializers.CharField()
     enc_master_key_nonce = serializers.CharField()
     kdf_salt = serializers.CharField()
-    kdf_memory_kb = serializers.IntegerField()
-    kdf_iterations = serializers.IntegerField()
-    kdf_parallelism = serializers.IntegerField()
+    kdf_memory_kb = serializers.IntegerField(**_KDF_MEMORY_KB)
+    kdf_iterations = serializers.IntegerField(**_KDF_ITERATIONS)
+    kdf_parallelism = serializers.IntegerField(**_KDF_PARALLELISM)
 
     def validate_new_password(self, v): validate_password(v); return v
     def validate_enc_master_key(self, v): return _from_hex(v, "enc_master_key", min_len=48)
