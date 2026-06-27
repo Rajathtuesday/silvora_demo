@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — Silvora</title>
+<style>
+  :root {
+    --bg: #080910;
+    --card: #141620;
+    --primary-light: #7B6FF8;
+    --gold: #D4AF6A;
+    --error: #F05B6D;
+    --text: #FFFFFF;
+    --text-secondary: #8A8FAA;
+    --text-muted: #4A4F6A;
+    --border: #232639;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .wrap { max-width: 420px; width: 100%; margin: 0 auto; padding: 40px 28px; text-align: center; }
+  .brand { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 36px; }
+  .brand-dot { width: 12px; height: 12px; border-radius: 3px; background: linear-gradient(135deg, var(--primary-light), var(--gold)); }
+  .brand-name { font-weight: 700; letter-spacing: 0.06em; color: var(--text); font-size: 14px; text-transform: uppercase; }
+  .icon-circle {
+    width: 76px; height: 76px; margin: 0 auto 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(240,91,109,0.12); border: 1px solid rgba(240,91,109,0.35);
+  }
+  .icon-circle svg { width: 34px; height: 34px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  p { color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div class="brand-name">Silvora</div>
+    </div>
+    <div class="icon-circle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#F05B6D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </div>
+    <h1>Couldn't open checkout</h1>
+    <p>{{ message }}</p>
+  </div>
+</body>
+</html>

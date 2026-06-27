@@ -22,6 +22,7 @@ from django.conf.urls.static import static
 from .healthcheck import healthcheck
 from .legal import PrivacyPolicyView, TermsOfServiceView
 from .pages import LandingView
+from billing.views import billing_checkout_page
 
 # SimpleJWT views
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -46,6 +47,7 @@ urlpatterns = [
 
     # Billing (Razorpay subscriptions)
     path('api/billing/', include('billing.urls')),
+    path('billing/checkout/', billing_checkout_page, name='billing_checkout'),
 
 
     # Healthcheck endpoint

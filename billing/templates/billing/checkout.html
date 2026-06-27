@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subscribe — Silvora</title>
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<style>
+  :root {
+    --bg: #080910;
+    --surface: #0F1018;
+    --card: #141620;
+    --primary: #5B4FE8;
+    --primary-light: #7B6FF8;
+    --gold: #D4AF6A;
+    --success: #3DD68C;
+    --error: #F05B6D;
+    --text: #FFFFFF;
+    --text-secondary: #8A8FAA;
+    --text-muted: #4A4F6A;
+    --border: #232639;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .wrap {
+    max-width: 420px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 40px 28px;
+    text-align: center;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 36px;
+  }
+  .brand-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    background: linear-gradient(135deg, var(--primary-light), var(--gold));
+  }
+  .brand-name {
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: var(--text);
+    font-size: 14px;
+    text-transform: uppercase;
+  }
+  .icon-circle {
+    width: 76px; height: 76px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(91,79,232,0.12);
+    border: 1px solid rgba(91,79,232,0.35);
+  }
+  .icon-circle svg { width: 34px; height: 34px; }
+  h1 { font-size: 20px; margin: 0 0 10px; }
+  p { color: var(--text-secondary); font-size: 14.5px; line-height: 1.6; margin: 0 0 24px; }
+  .plan-name { color: var(--gold); font-weight: 700; text-transform: capitalize; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 18px;
+  }
+  button {
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 14px 28px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button:hover { background: var(--primary-light); }
+  #status { margin-top: 18px; font-size: 13px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-dot"></div>
+      <div class="brand-name">Silvora</div>
+    </div>
+
+    <div class="icon-circle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#5B4FE8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+    </div>
+
+    <h1>Subscribe to <span class="plan-name">{{ tier }}</span></h1>
+    <p>Billed {{ interval }}. You'll complete payment through Razorpay below — this never touches Silvora directly.</p>
+
+    <button id="payBtn">Continue to Payment</button>
+    <div id="status"></div>
+
+    <div class="card">
+      Your plan activates automatically once payment confirms — usually within a few seconds. You can close this page and return to the Silvora app any time after that.
+    </div>
+  </div>
+
+<script>
+  var statusEl = document.getElementById('status');
+  var options = {
+    key: "{{ razorpay_key_id }}",
+    subscription_id: "{{ subscription_id }}",
+    name: "Silvora",
+    description: "{{ tier|capfirst }} ({{ interval }})",
+    theme: { color: "#5B4FE8" },
+    handler: function (response) {
+      statusEl.textContent = "Payment received — activating your subscription. You can close this page now.";
+      document.getElementById('payBtn').style.display = 'none';
+    },
+    modal: {
+      ondismiss: function () {
+        statusEl.textContent = "Checkout closed — tap Continue to Payment to try again.";
+      }
+    }
+  };
+
+  document.getElementById('payBtn').onclick = function () {
+    var rzp = new Razorpay(options);
+    rzp.on('payment.failed', function (resp) {
+      statusEl.textContent = "Payment failed: " + (resp.error && resp.error.description ? resp.error.description : "please try again.");
+    });
+    rzp.open();
+  };
+</script>
+</body>
+</html>
