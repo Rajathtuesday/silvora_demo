@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -49,8 +50,9 @@
 :root {
   --bg: #0d0d12;
   --text: #f5f5f7;
-  --accent: #9255e8;
-  --accent-soft: rgba(146, 85, 232, 0.45);
+  --accent: #5B4FE8;
+  --accent-soft: rgba(91, 79, 232, 0.45);
+  --gold: #D4AF6A;
   --glass: rgba(255, 255, 255, 0.05);
 }
 
@@ -114,6 +116,7 @@ section {
 }
 .nav a:hover { opacity: 1; }
 .nav a.active { opacity: 1; color: var(--accent); }
+.nav-download { padding: 10px 22px !important; font-size: 0.9rem; }
 
 /* Hero */
 .hero {
@@ -163,6 +166,11 @@ section {
   font-weight: 600;
   color: #ff9933;
 }
+.play-store-note {
+  margin-top: 16px;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
 .indian-flag::before {
   content: "";
   width: 20px;
@@ -207,6 +215,57 @@ section {
   transform: translateY(40px);
 }
 .feature h3 { color: var(--accent); margin-bottom: 12px; }
+
+/* Pricing */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px,1fr));
+  gap: 28px;
+  max-width: 950px;
+  margin: 0 auto;
+}
+.plan {
+  background: var(--glass);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  padding: 32px 28px;
+  position: relative;
+  opacity: 0;
+  transform: translateY(40px);
+}
+.plan-premium {
+  border-color: rgba(212,175,106,.45);
+  box-shadow: 0 0 32px rgba(212,175,106,.08);
+}
+.plan-badge {
+  position: absolute;
+  top: -12px;
+  right: 24px;
+  background: var(--gold);
+  color: #1a1408;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.plan-name {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: .65;
+  margin-bottom: 12px;
+}
+.plan-premium .plan-name { color: var(--gold); opacity: 1; }
+.plan-price {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.plan-price span { font-size: 1rem; opacity: .6; font-weight: 400; }
+.plan-storage { opacity: .8; margin-bottom: 14px; font-weight: 600; }
+.plan p { opacity: .65; font-size: 0.92rem; line-height: 1.5; margin: 0; }
 
 /* Use cases */
 .usecases {
@@ -325,7 +384,8 @@ footer a {
     <a href="/" class="active">Home</a>
     <a href="#about">About</a>
     <a href="#features">Features</a>
-    <a href="javascript:void(0)" onclick="openModal()">Early Access</a>
+    <a href="#pricing">Pricing</a>
+    <a class="btn nav-download" href="{% static 'downloads/silvora.apk' %}">Download for Android</a>
   </div>
 </header>
 
@@ -347,7 +407,8 @@ footer a {
     A zero-knowledge cloud built for those who value ownership, not surveillance.
     Store, sync, and share files with military-grade encryption-only you have the keys.
   </p>
-  <button class="btn" onclick="openModal()">Request Early Access</button>
+  <a class="btn" href="{% static 'downloads/silvora.apk' %}">Download for Android</a>
+  <div class="play-store-note">Coming soon to Google Play &mdash; download the APK directly for now.</div>
 </section>
 
 <section id="features">
@@ -358,6 +419,32 @@ footer a {
     <div class="feature"><h3>Secure Sync Across Devices</h3><p>Access your encrypted files safely on all your devices with automatic sync.</p></div>
     <div class="feature"><h3>Data Sovereignty</h3><p>Hosted and operated from India, complying with local data protection norms.</p></div>
   </div>
+</section>
+
+<section id="pricing">
+  <h2 style="text-align:center;margin-bottom:38px;">Pricing</h2>
+  <div class="pricing-grid">
+    <div class="plan">
+      <div class="plan-name">Free</div>
+      <div class="plan-price">&#8377;0</div>
+      <div class="plan-storage">1GB storage</div>
+      <p>Everything end-to-end encrypted, no time limit, no credit card.</p>
+    </div>
+    <div class="plan">
+      <div class="plan-name">Pro</div>
+      <div class="plan-price">&#8377;199<span>/mo</span></div>
+      <div class="plan-storage">100GB storage</div>
+      <p>For real day-to-day use across all your devices.</p>
+    </div>
+    <div class="plan plan-premium">
+      <div class="plan-badge">Most storage</div>
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-price">&#8377;599<span>/mo</span></div>
+      <div class="plan-storage">1TB storage</div>
+      <p>For teams and power users who need serious room to grow.</p>
+    </div>
+  </div>
+  <p style="text-align:center;opacity:0.6;font-size:0.9rem;margin-top:24px;">Yearly billing available in-app at 2 months free. Manage your plan any time from the app.</p>
 </section>
 
 <section>
@@ -372,8 +459,8 @@ footer a {
 
 <section class="cta-block">
   <h2>Launch Your Private Cloud</h2>
-  <p>Join as a founding user and help shape the future of privacy-first cloud storage in India.</p>
-  <button class="btn" onclick="openModal()">Join Early Access</button>
+  <p>Free to start, 1GB on us. Download the app and your encrypted vault is ready in under a minute.</p>
+  <a class="btn" href="{% static 'downloads/silvora.apk' %}">Download for Android</a>
 </section>
 
 <footer>
@@ -382,32 +469,12 @@ footer a {
   <small><a href="/privacy/">Privacy Policy</a> &middot; <a href="/terms/">Terms of Service</a></small>
 </footer>
 
-<!-- Modal -->
-<div id="modalBG" class="modal-bg">
-  <div class="modal">
-    <header>
-      Join Early Access
-      <span class="close-btn" onclick="closeModal()">&#10005;</span>
-    </header>
-    <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSehqVJhtiQCVZL29cFUbMRVPUTY-U_NLFuMvkg90cvO_eYwZA/viewform?embedded=true" width="640" height="946" frameborder="0" marginheight="0" marginwidth="0">Loading&hellip;</iframe>
-  </div>
-</div>
-
 <script>
-const modal = document.getElementById("modalBG");
-function openModal() { modal.classList.add("active"); }
-function closeModal() { modal.classList.remove("active"); }
-
-// Close modal on ESC key
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeModal();
-});
-
 // reveal animation
 const obs = new IntersectionObserver(entries => {
   entries.forEach(e => e.isIntersecting && e.target.classList.add("reveal"));
 });
-document.querySelectorAll('.feature,.uc').forEach(f => obs.observe(f));
+document.querySelectorAll('.feature,.uc,.plan').forEach(f => obs.observe(f));
 
 // Smooth scroll for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
