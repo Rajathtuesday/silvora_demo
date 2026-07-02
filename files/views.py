@@ -1,5 +1,6 @@
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db import transaction
@@ -16,21 +17,27 @@ from .services.storage_gateway import StorageGateway
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def start_upload(request):
+    request.throttle_scope = "file_mutate"
     service = UploadService(request.user)
     data, status_code = service.start(request.data)
     return Response(data, status=status_code)
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def resume_upload(request, file_id):
+    request.throttle_scope = "file_meta"
     service = UploadService(request.user)
     data, status_code = service.resume(file_id)
     return Response(data, status=status_code)
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def upload_chunk(request, file_id, index):
+    request.throttle_scope = "file_chunk"
     blob = request.FILES.get("chunk")
     if not blob:
         return Response({"error": "Missing chunk"}, status=400)
@@ -41,7 +48,9 @@ def upload_chunk(request, file_id, index):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def upload_integrity(request, file_id):
+    request.throttle_scope = "file_mutate"
     # The client posts the encrypted integrity manifest as raw bytes.
     blob = request.body
     if not blob:
@@ -53,7 +62,9 @@ def upload_integrity(request, file_id):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def commit_upload(request, file_id):
+    request.throttle_scope = "file_mutate"
     service = UploadService(request.user)
     data, status_code = service.commit(file_id)
     return Response(data, status=status_code)
@@ -64,7 +75,9 @@ def commit_upload(request, file_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def list_files(request):
+    request.throttle_scope = "file_meta"
     files = FileRecord.objects.filter(
         owner=request.user,
         tenant=request.user.tenant,
@@ -90,7 +103,9 @@ def list_files(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def list_trash(request):
+    request.throttle_scope = "file_meta"
     trash = FileRecord.objects.filter(
         owner=request.user,
         tenant=request.user.tenant,
@@ -111,7 +126,9 @@ def list_trash(request):
 
 @api_view(["DELETE"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def delete_file(request, file_id):
+    request.throttle_scope = "file_mutate"
     file = FileRecord.objects.filter(
         id=file_id,
         owner=request.user,
@@ -120,6 +137,18 @@ def delete_file(request, file_id):
 
     if not file:
         return Response({"error": "File not found"}, status=404)
+
+    if file.upload_state != FileRecord.UploadState.COMMITTED:
+        # Upload was never finished — nothing was ever added to used_bytes
+        # (QuotaService.consume only runs at commit), so there's no quota to
+        # release and no trash semantics apply. Just purge the abandoned
+        # chunks and drop the record outright.
+        with transaction.atomic():
+            storage = StorageGateway()
+            base = r2_base(file.tenant_id, file.owner_id, file.id)
+            storage.delete_recursive(base)
+            file.delete()
+        return Response({"status": "abandoned_upload_removed"})
 
     if file.deleted_at is None:
         # SOFT DELETE
@@ -138,7 +167,9 @@ def delete_file(request, file_id):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def restore_file(request, file_id):
+    request.throttle_scope = "file_mutate"
     with transaction.atomic():
         file = get_object_or_404(
             FileRecord, id=file_id, owner=request.user,
@@ -154,6 +185,7 @@ def restore_file(request, file_id):
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def rename_file(request, file_id):
     """
     Stores a new encrypted filename. The server never sees the plaintext
@@ -162,8 +194,10 @@ def rename_file(request, file_id):
     at upload time) and sends the new ciphertext/nonce/mac, same shape as
     start_upload. The server's job is just to swap these three fields.
     """
+    request.throttle_scope = "file_mutate"
     file = get_object_or_404(
         FileRecord, id=file_id, owner=request.user, tenant=request.user.tenant,
+        deleted_at__isnull=True,
     )
 
     cipher_hex = request.data.get("filename_ciphertext")
@@ -189,7 +223,9 @@ def rename_file(request, file_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def get_storage_quota(request):
+    request.throttle_scope = "file_meta"
     quota = QuotaService.get_or_create_user_quota(request.user)
 
     data = {
@@ -219,7 +255,9 @@ def get_storage_quota(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def download_manifest(request, file_id):
+    request.throttle_scope = "file_meta"
     file = get_object_or_404(
         FileRecord, id=file_id, owner=request.user,
         tenant=request.user.tenant, deleted_at__isnull=True,
@@ -230,7 +268,9 @@ def download_manifest(request, file_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def download_integrity(request, file_id):
+    request.throttle_scope = "file_meta"
     file = get_object_or_404(
         FileRecord, id=file_id, owner=request.user,
         tenant=request.user.tenant, deleted_at__isnull=True,
@@ -245,7 +285,9 @@ def download_integrity(request, file_id):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([ScopedRateThrottle])
 def download_chunk(request, file_id, index):
+    request.throttle_scope = "file_chunk"
     file = get_object_or_404(
         FileRecord, id=file_id, owner=request.user,
         tenant=request.user.tenant, deleted_at__isnull=True,

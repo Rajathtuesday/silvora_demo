@@ -5,11 +5,13 @@ from uuid import UUID
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.db import transaction
+from django.db.models import Sum
 from django.core.exceptions import ValidationError
 
 from ..models import FileRecord
 from .storage_gateway import StorageGateway
 from .quota_service import QuotaService
+from users.models import UserQuota
 
 import hashlib
 import json
@@ -80,25 +82,54 @@ class UploadService:
         if not cipher_hex or not nonce_hex or not mac_hex:
             return {"error": "Filename metadata required"}, 400
 
-        user_quota = QuotaService.get_or_create_user_quota(self.user)
+        # get_or_create must happen OUTSIDE the locking transaction below:
+        # get_or_create's own internal transaction commits and releases its
+        # lock before returning, so a fresh select_for_update() afterwards
+        # reliably finds the row instead of racing its creation.
+        QuotaService.get_or_create_user_quota(self.user)
         QuotaService.get_or_create_tenant_quota(self.user.tenant)
 
-        if not user_quota.can_store(total_size):
-            return {"error": "Quota exceeded"}, 403
+        # Quota is only *consumed* (added to used_bytes) at commit time, but an
+        # unbounded number of in-flight uploads could otherwise sit in R2 far
+        # past any single user's quota before any of them commit — real
+        # storage cost with no enforcement. Reserve capacity here by summing
+        # the declared size of every upload this user still has in flight
+        # (not expired, not yet committed) and rejecting if the new upload
+        # would push reserved+used past the limit. select_for_update() makes
+        # concurrent `start` calls serialize on this check so two parallel
+        # requests can't both pass it for the same remaining headroom.
+        now = timezone.now()
+        with transaction.atomic():
+            user_quota = UserQuota.objects.select_for_update().get(user=self.user)
 
-        expires_at = timezone.now() + timedelta(hours=24)
+            pending_size = FileRecord.objects.filter(
+                owner=self.user,
+                upload_state__in=[
+                    FileRecord.UploadState.INITIATED,
+                    FileRecord.UploadState.UPLOADING,
+                ],
+                upload_expires_at__gt=now,
+            ).aggregate(total=Sum("size"))["total"] or 0
 
-        file = FileRecord.objects.create(
-            id=file_id,  # 🔥 IMPORTANT CHANGE
-            owner=self.user,
-            tenant=self.user.tenant,
-            security_mode=security_mode,
-            upload_state=FileRecord.UploadState.INITIATED,
-            upload_expires_at=expires_at,
-            filename_ciphertext=bytes.fromhex(cipher_hex),
-            filename_nonce=bytes.fromhex(nonce_hex),
-            filename_mac=bytes.fromhex(mac_hex),
-        )
+            if user_quota.limit_bytes and (
+                user_quota.used_bytes + pending_size + total_size > user_quota.limit_bytes
+            ):
+                return {"error": "Quota exceeded"}, 403
+
+            expires_at = now + timedelta(hours=24)
+
+            file = FileRecord.objects.create(
+                id=file_id,
+                owner=self.user,
+                tenant=self.user.tenant,
+                security_mode=security_mode,
+                upload_state=FileRecord.UploadState.INITIATED,
+                upload_expires_at=expires_at,
+                size=total_size,  # declared size, reserved against quota until commit finalises it
+                filename_ciphertext=bytes.fromhex(cipher_hex),
+                filename_nonce=bytes.fromhex(nonce_hex),
+                filename_mac=bytes.fromhex(mac_hex),
+            )
 
         return {
             "file_id": str(file.id),
@@ -117,6 +148,7 @@ class UploadService:
             id=file_id,
             owner=self.user,
             tenant=self.user.tenant,
+            deleted_at__isnull=True,
         )
 
         base = r2_base(file.tenant_id, file.owner_id, file.id)
@@ -142,6 +174,7 @@ class UploadService:
             id=file_id,
             owner=self.user,
             tenant=self.user.tenant,
+            deleted_at__isnull=True,
         )
 
         # Expiry protection
@@ -191,6 +224,7 @@ class UploadService:
             id=file_id,
             owner=self.user,
             tenant=self.user.tenant,
+            deleted_at__isnull=True,
         )
 
         # Only writable while the upload is still in flight.
@@ -217,6 +251,7 @@ class UploadService:
             id=file_id,
             owner=self.user,
             tenant=self.user.tenant,
+            deleted_at__isnull=True,
         )
 
         # Idempotency

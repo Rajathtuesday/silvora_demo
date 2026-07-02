@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import timedelta
 from pathlib import Path
 import dj_database_url
@@ -18,20 +19,25 @@ load_dotenv(BASE_DIR / ".env")
 _secret = os.environ.get("DJANGO_SECRET_KEY")
 if not _secret and not os.environ.get("DJANGO_DEBUG", "False") == "True":
     raise ValueError("DJANGO_SECRET_KEY environment variable is not set in production.")
-SECRET_KEY = _secret or "django-insecure-dev-key-change-this"
+# No hardcoded fallback string: a fixed value committed to the repo would let
+# anyone who has read the source forge session/CSRF tokens if DEBUG is ever
+# accidentally left True in a real deployment. For local dev without the env
+# var set, generate a fresh random key per process instead — sessions just
+# don't survive a dev-server restart, which is the correct trade-off.
+SECRET_KEY = _secret or secrets.token_urlsafe(64)
 DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [
     "app.silvora.cloud",
     "silvora.cloud",
     "api.silvora.cloud",
-    ".onrender.com",  # any Render subdomain (e.g. silvora-backend.onrender.com)
+    "silvora-demo.onrender.com",  # actual live Render hostname per Cloudflare DNS (api/root both CNAME here)
     "localhost",
     "127.0.0.1",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://*.onrender.com",
+    "https://silvora-demo.onrender.com",
     "https://silvora.cloud",
     "https://api.silvora.cloud",
     "https://app.silvora.cloud",
@@ -166,20 +172,32 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated"
     ],
     # Throttling. ScopedRateThrottle only limits views that declare a
-    # `throttle_scope` (login / register / master-key), so authenticated
-    # file operations are NOT rate-limited. AnonRateThrottle is a general
-    # backstop for unauthenticated traffic.
+    # `throttle_scope`. AnonRateThrottle is a general backstop for
+    # unauthenticated traffic; UserRateThrottle is a blanket per-user cap so
+    # an authenticated but unscoped view is never fully unlimited even if a
+    # future endpoint forgets to declare a scope.
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
         "rest_framework.throttling.ScopedRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "30/min",
+        "user": "600/min",
         "register": "5/min",
         "login": "10/min",
         "master_key": "10/min",
         "email_verify": "5/min",
         "billing": "10/min",
+        # File chunk transfer happens at high frequency for large files
+        # (a 1 GB upload at 5 MB/chunk is ~200 requests), so these scopes
+        # sit well above normal usage while still bounding abuse.
+        "file_chunk": "300/min",
+        # start/commit/delete/restore/rename are once-per-file operations —
+        # far lower legitimate frequency than chunk transfer.
+        "file_mutate": "60/min",
+        # list/resume/quota reads.
+        "file_meta": "120/min",
     },
 }
 
