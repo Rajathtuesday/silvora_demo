@@ -260,22 +260,22 @@ R2_PUBLIC_BASE = f"{R2_ENDPOINT}/{R2_BUCKET_NAME}" if R2_ENDPOINT else None
 # =====================================================
 # 📧 EMAIL (verification, billing notices)
 # =====================================================
-# Gmail SMTP relay — same mechanism as Rasova's setup, kept deliberately
-# consistent across both projects. EMAIL_USER/EMAIL_PASSWORD are a Gmail App
-# Password, not the account password.
+# Resend SMTP relay. EMAIL_HOST_USER is the literal string "resend" for
+# every Resend account (not a secret) -- the actual credential is the API
+# key, passed as the SMTP password via RESEND_API_KEY.
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = "smtp.gmail.com"
+EMAIL_HOST = "smtp.resend.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 # Django's SMTP backend has no timeout at all by default — a slow/blocked
-# connection to Gmail hangs the entire request indefinitely instead of
-# failing fast, which defeats the point of registration being designed to
-# never block on email delivery. 10s is generous for a normal SMTP
-# handshake and short enough that a stuck connection still fails fast.
+# connection hangs the entire request indefinitely instead of failing fast,
+# which defeats the point of registration being designed to never block on
+# email delivery. 10s is generous for a normal SMTP handshake and short
+# enough that a stuck connection still fails fast.
 EMAIL_TIMEOUT = 10
-EMAIL_HOST_USER = os.environ.get("EMAIL_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
-DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_USER", "noreply@silvora.cloud")
+EMAIL_HOST_USER = "resend"
+EMAIL_HOST_PASSWORD = os.environ.get("RESEND_API_KEY")
+DEFAULT_FROM_EMAIL = "noreply@silvora.cloud"
 
 # Public base URL used to build the verification link sent by email (no
 # `request` object available outside the view that triggers the send, and
