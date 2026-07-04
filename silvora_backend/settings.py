@@ -265,7 +265,13 @@ R2_PUBLIC_BASE = f"{R2_ENDPOINT}/{R2_BUCKET_NAME}" if R2_ENDPOINT else None
 # key, passed as the SMTP password via RESEND_API_KEY.
 EMAIL_BACKEND = os.environ.get("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
 EMAIL_HOST = "smtp.resend.com"
-EMAIL_PORT = 587
+# 2587, not the standard 587 -- Render (like many PaaS hosts) blocks or
+# heavily restricts outbound traffic on standard SMTP ports to prevent spam
+# relay abuse. Resend documents 2587/3587 as STARTTLS alternates precisely
+# for hosts in this situation. A prior attempt on 587 failed with a raw
+# socket timeout (not an auth error), which is the signature of a blocked
+# port rather than a credentials problem.
+EMAIL_PORT = 2587
 EMAIL_USE_TLS = True
 # Django's SMTP backend has no timeout at all by default — a slow/blocked
 # connection hangs the entire request indefinitely instead of failing fast,
