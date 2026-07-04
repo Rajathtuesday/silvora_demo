@@ -286,7 +286,12 @@ DEFAULT_FROM_EMAIL = "noreply@silvora.cloud"
 # Public base URL used to build the verification link sent by email (no
 # `request` object available outside the view that triggers the send, and
 # this keeps the link host correct in dev vs prod without guessing from env).
-SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://app.silvora.cloud")
+# Points at api.silvora.cloud, not app.silvora.cloud: both links built from
+# this value (verify-email, billing checkout) are Django views served by
+# THIS backend, and api.silvora.cloud's DNS already correctly reaches it.
+# app.silvora.cloud is still a dead Cloudflare Tunnel as of 2026-07-04 --
+# switch back once that's pointed at this backend too.
+SITE_BASE_URL = os.environ.get("SITE_BASE_URL", "https://api.silvora.cloud")
 
 # Bump this string whenever the privacy policy materially changes — stored
 # on each user at registration (privacy_policy_version) so old acceptances
