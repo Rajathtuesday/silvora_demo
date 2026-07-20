@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Privacy Policy — Silvora</title>
+<title>Privacy Policy - Silvora</title>
 <link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
 <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
 <style>
@@ -138,7 +138,7 @@
   <p>
     Silvora is a zero-knowledge, end-to-end encrypted (E2EE) file storage app.
     This page explains, as plainly as possible, what information Silvora collects,
-    what is encrypted before it ever reaches our servers, and what — by design —
+    what is encrypted before it ever reaches our servers, and what - by design -
     we are technically unable to see.
   </p>
 
@@ -146,37 +146,37 @@
   <p>
     <span class="tag cant">We can't see</span> your files, your filenames, or the
     encryption key that protects them. They are encrypted on your device before
-    upload, and only your device — using your password or 24-word recovery phrase —
+    upload, and only your device - using your password or 24-word recovery phrase -
     can decrypt them.
   </p>
   <p>
     <span class="tag can">We can see</span> your account email, the size of each
     file (in bytes), and timestamps (when a file was uploaded, modified, or deleted).
     This is unavoidable metadata needed to operate storage, quotas, and the file
-    list — but it never reveals what's inside a file or what it's called.
+    list - but it never reveals what's inside a file or what it's called.
   </p>
 
   <h2>Information we collect</h2>
 
   <h3>Account information</h3>
   <ul>
-    <li><strong>Email address</strong> — used as your account identifier (login)
+    <li><strong>Email address</strong> - used as your account identifier (login)
       and, if you choose, for account-related communication (e.g. security notices).</li>
-    <li><strong>Password</strong> — stored only as a one-way hash using Django's
+    <li><strong>Password</strong> - stored only as a one-way hash using Django's
       standard password hashing. We never store, log, or have access to your
       plaintext password.</li>
   </ul>
 
   <h3>Encryption keys and recovery</h3>
   <ul>
-    <li><strong>Encrypted master key envelope</strong> — your master encryption key
+    <li><strong>Encrypted master key envelope</strong> - your master encryption key
       itself never leaves your device in usable form. We only store an encrypted
       "envelope" (ciphertext + nonce) that can only be opened on your device using
       a key derived from your password (via Argon2id).</li>
-    <li><strong>Recovery envelope</strong> — a second encrypted copy of the same
+    <li><strong>Recovery envelope</strong> - a second encrypted copy of the same
       master key, openable only with your 24-word recovery phrase. We store this
       envelope, but never the phrase itself.</li>
-    <li><strong>Recovery phrase verification hash</strong> — to confirm you've
+    <li><strong>Recovery phrase verification hash</strong> - to confirm you've
       entered the correct recovery phrase, we store a one-way hash derived from it
       (via HKDF, then a standard password hash). This lets the server verify
       "yes, that's the right phrase" without ever learning or storing the phrase.</li>
@@ -184,16 +184,16 @@
 
   <h3>Your files</h3>
   <ul>
-    <li><strong>File contents</strong> — encrypted on your device (XChaCha20-Poly1305)
+    <li><strong>File contents</strong> - encrypted on your device (XChaCha20-Poly1305)
       before upload. The server stores only ciphertext and cannot decrypt it.</li>
-    <li><strong>Filenames</strong> — also encrypted on your device before upload
+    <li><strong>Filenames</strong> - also encrypted on your device before upload
       (ciphertext, nonce, and integrity tag). The server cannot read your filenames.</li>
-    <li><strong>File size, in bytes</strong> — visible to the server, since it's
+    <li><strong>File size, in bytes</strong> - visible to the server, since it's
       needed to allocate storage and enforce your quota. File size does not reveal
       file contents.</li>
-    <li><strong>Timestamps</strong> — when a file was created, modified, or deleted,
+    <li><strong>Timestamps</strong> - when a file was created, modified, or deleted,
       used for the file list, sync, and cleanup of deleted items.</li>
-    <li><strong>Internal storage identifiers</strong> — opaque IDs and storage paths
+    <li><strong>Internal storage identifiers</strong> - opaque IDs and storage paths
       used internally to locate the encrypted blob in storage. These do not contain
       or reveal your filename or content.</li>
   </ul>
@@ -219,24 +219,24 @@
     <li>We cannot read the contents of your files.</li>
     <li>We cannot read your filenames.</li>
     <li>We cannot recover your account if you lose <em>both</em> your password
-      and your 24-word recovery phrase — there is no "reset" path that bypasses
+      and your 24-word recovery phrase - there is no "reset" path that bypasses
       encryption, because we never have access to the key.</li>
     <li>We cannot view, sell, or share data we don't have. We have nothing to
-      hand over for your files even if compelled to — only encrypted bytes.</li>
+      hand over for your files even if compelled to - only encrypted bytes.</li>
   </ul>
 
   <h2>Infrastructure &amp; third parties</h2>
   <p>Silvora runs on a small set of infrastructure providers, each of which only
     ever sees encrypted data where applicable:</p>
   <ul>
-    <li><strong>Render</strong> — hosts the backend application server.</li>
-    <li><strong>Neon (PostgreSQL)</strong> — hosts the database (account records,
+    <li><strong>Render</strong> - hosts the backend application server.</li>
+    <li><strong>Neon (PostgreSQL)</strong> - hosts the database (account records,
       encrypted key envelopes, file metadata).</li>
-    <li><strong>Cloudflare R2</strong> — stores encrypted file blobs.</li>
-    <li><strong>Razorpay</strong> — processes subscription payments if you
+    <li><strong>Cloudflare R2</strong> - stores encrypted file blobs.</li>
+    <li><strong>Razorpay</strong> - processes subscription payments if you
       upgrade to a paid plan. Razorpay sees your payment details directly;
       Silvora never receives or stores your card/UPI information.</li>
-    <li><strong>Gmail (Google)</strong> — sends account emails (e.g. email
+    <li><strong>Gmail (Google)</strong> - sends account emails (e.g. email
       verification). Your email address passes through Google's servers
       to deliver these.</li>
   </ul>
@@ -248,22 +248,22 @@
     account data. EU/UK residents have these rights under GDPR; we extend the
     same rights to everyone, not just where legally required:</p>
   <ul>
-    <li><strong>Right to access</strong> — use <strong>Settings → Export My
+    <li><strong>Right to access</strong> - use <strong>Settings → Export My
       Data</strong> in the app to download everything tied to your account:
       every file (decrypted locally, on your device, the same way normal
       downloads work) plus your account profile and usage info as a single
       file.</li>
-    <li><strong>Right to erasure</strong> — <strong>Settings → Delete
+    <li><strong>Right to erasure</strong> - <strong>Settings → Delete
       Account</strong> permanently and immediately removes your files,
       encryption key envelopes, and account record. See "Data retention &amp;
       deletion" below.</li>
-    <li><strong>Right to rectification</strong> — applies to account-level
-      info like your email address, not file contents — we have no way to
+    <li><strong>Right to rectification</strong> - applies to account-level
+      info like your email address, not file contents - we have no way to
       "correct" data we cannot read in the first place.</li>
-    <li><strong>Right to portability</strong> — the same export above gives
+    <li><strong>Right to portability</strong> - the same export above gives
       you your data in a form you can move elsewhere; nothing is locked into
       a proprietary format beyond standard encryption you hold the key to.</li>
-    <li><strong>Right to object / restrict processing</strong> — contact us
+    <li><strong>Right to object / restrict processing</strong> - contact us
       (below) and we'll act on this manually; Silvora's automated processing
       is limited to storage, quota enforcement, and billing.</li>
   </ul>
@@ -293,10 +293,10 @@
     "Last updated" date.</p>
 
   <h2>Contact</h2>
-  <p>Questions about this policy or your data: <a href="mailto:fortunecloudmentors@gmail.com">fortunecloudmentors@gmail.com</a></p>
+  <p>Questions about this policy or your data: <a href="mailto:privacy@rasova.net">privacy@rasova.net</a></p>
 
   <footer>
-    Silvora — zero-knowledge encrypted storage. See also our
+    Silvora - zero-knowledge encrypted storage. See also our
     <a href="/terms/">Terms of Service</a>.
   </footer>
 
