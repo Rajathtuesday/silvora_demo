@@ -22,6 +22,7 @@ from django.conf.urls.static import static
 from .healthcheck import healthcheck
 from .legal import PrivacyPolicyView, TermsOfServiceView
 from .pages import LandingView
+from .admin_tools import send_tester_switch_email
 from billing.views import billing_checkout_page
 
 # SimpleJWT views
@@ -56,6 +57,9 @@ urlpatterns = [
     # Legal
     path('privacy/', PrivacyPolicyView.as_view(), name='privacy_policy'),
     path('terms/', TermsOfServiceView.as_view(), name='terms_of_service'),
+
+    # Internal, staff-only tools
+    path('admin-tools/send-tester-email/', send_tester_switch_email, name='send_tester_switch_email'),
 ]
 
 # Serve media in development
