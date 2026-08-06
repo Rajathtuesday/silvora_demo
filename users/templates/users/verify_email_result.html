@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{% if success %}Email verified{% else %}Verification link{% endif %} — Silvora</title>
+<title>{% if success %}Email verified{% else %}Verification link{% endif %} - Silvora</title>
 <style>
   :root {
     --bg: #080910;
@@ -104,7 +104,7 @@
 
     {% if success %}
       <h1>Email verified</h1>
-      <p>Your email address is confirmed. You can close this page and go back to the Silvora app — there's nothing else to do.</p>
+      <p>Your email address is confirmed. You can close this page and go back to the Silvora app. There's nothing else to do.</p>
     {% else %}
       <h1>{{ heading }}</h1>
       <p>{{ message }}</p>
@@ -112,7 +112,7 @@
 
     <div class="card">
       {% if success %}
-        This was never required for your vault to work — your 24-word recovery phrase is what actually keeps your account safe.
+        This was never required for your vault to work. Your 24-word recovery phrase is what actually keeps your account safe.
       {% else %}
         Open the Silvora app and use <strong>Resend verification email</strong> from the banner at the top of your vault to get a new link.
       {% endif %}

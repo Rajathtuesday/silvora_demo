@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Subscribe — Silvora</title>
+<title>Subscribe - Silvora</title>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <style>
   :root {
@@ -107,13 +107,13 @@
     </div>
 
     <h1>Subscribe to <span class="plan-name">{{ tier }}</span></h1>
-    <p>Billed {{ interval }}. You'll complete payment through Razorpay below — this never touches Silvora directly.</p>
+    <p>Billed {{ interval }}. You'll complete payment through Razorpay below. This never touches Silvora directly.</p>
 
     <button id="payBtn">Continue to Payment</button>
     <div id="status"></div>
 
     <div class="card">
-      Your plan activates automatically once payment confirms — usually within a few seconds. You can close this page and return to the Silvora app any time after that.
+      Your plan activates automatically once payment confirms, usually within a few seconds. You can close this page and return to the Silvora app any time after that.
     </div>
   </div>
 
@@ -126,12 +126,12 @@
     description: "{{ tier|capfirst }} ({{ interval }})",
     theme: { color: "#5B4FE8" },
     handler: function (response) {
-      statusEl.textContent = "Payment received — activating your subscription. You can close this page now.";
+      statusEl.textContent = "Payment received. Activating your subscription. You can close this page now.";
       document.getElementById('payBtn').style.display = 'none';
     },
     modal: {
       ondismiss: function () {
-        statusEl.textContent = "Checkout closed — tap Continue to Payment to try again.";
+        statusEl.textContent = "Checkout closed. Tap Continue to Payment to try again.";
       }
     }
   };
