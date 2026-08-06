@@ -116,6 +116,32 @@ class BillingCheckoutPageTests(TestCase):
         self.assertEqual(res.status_code, 502)
         self.assertEqual(Subscription.objects.count(), 0)
 
+    @patch("billing.services.subscription_service.create_subscription")
+    def test_reloading_checkout_page_reuses_pending_subscription(self, mock_create):
+        mock_create.return_value = {"id": "sub_test456", "status": "created"}
+        token = self._token()
+
+        res1 = self.client.get("/billing/checkout/", {"token": token, "tier": "pro", "interval": "monthly"})
+        res2 = self.client.get("/billing/checkout/", {"token": token, "tier": "pro", "interval": "monthly"})
+
+        self.assertEqual(res1.status_code, 200)
+        self.assertEqual(res2.status_code, 200)
+        mock_create.assert_called_once()  # Razorpay hit exactly once
+        self.assertEqual(Subscription.objects.count(), 1)
+        self.assertContains(res2, "sub_test456")
+
+    @patch("billing.services.subscription_service.create_subscription")
+    def test_checkout_rejects_when_user_already_has_a_live_subscription(self, mock_create):
+        Subscription.objects.create(
+            user=self.user, plan=self.plan, razorpay_subscription_id="sub_existing", status="active",
+        )
+
+        res = self.client.get("/billing/checkout/", {"token": self._token(), "tier": "pro", "interval": "monthly"})
+
+        self.assertEqual(res.status_code, 409)
+        mock_create.assert_not_called()
+        self.assertEqual(Subscription.objects.count(), 1)
+
 
 @override_settings(RAZORPAY_WEBHOOK_SECRET=WEBHOOK_SECRET)
 class RazorpaySubscriptionWebhookTests(APITestCase):
@@ -220,6 +246,59 @@ class RazorpaySubscriptionWebhookTests(APITestCase):
 
         quota = UserQuota.objects.get(user=self.user)
         self.assertEqual(quota.tier, SubscriptionTier.PRO)  # same end state, not doubled
+
+    def test_replaying_cancelled_event_is_idempotent(self):
+        self._post_webhook("subscription.activated", current_end=1893456000)
+        mail.outbox = []
+        self._post_webhook("subscription.cancelled")
+        self.subscription.refresh_from_db()
+        first_grace, first_purge = self.subscription.grace_ends_at, self.subscription.purge_at
+
+        res = self._post_webhook("subscription.cancelled")
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.grace_ends_at, first_grace)  # not pushed further out
+        self.assertEqual(self.subscription.purge_at, first_purge)
+        self.assertEqual(len(mail.outbox), 1)  # still just the one email
+
+    def test_completed_event_after_already_cancelled_is_a_noop(self):
+        """Guard is 'already in a terminal state', not 'this exact event
+        name already ran' -- a completed redelivered after cancelled must
+        not re-fire either."""
+        self._post_webhook("subscription.activated", current_end=1893456000)
+        self._post_webhook("subscription.cancelled")
+        self.subscription.refresh_from_db()
+        first_grace = self.subscription.grace_ends_at
+        mail.outbox = []
+
+        self._post_webhook("subscription.completed")
+
+        self.subscription.refresh_from_db()
+        self.assertEqual(self.subscription.status, "cancelled")  # not overwritten
+        self.assertEqual(self.subscription.grace_ends_at, first_grace)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_replaying_payment_failed_within_window_sends_one_email(self):
+        self._post_webhook("subscription.activated", current_end=1893456000)
+        mail.outbox = []
+        self._post_webhook("payment.failed")
+        res = self._post_webhook("payment.failed")  # immediate redelivery
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_payment_failed_notifies_again_after_window_elapses(self):
+        self._post_webhook("subscription.activated", current_end=1893456000)
+        mail.outbox = []
+        self._post_webhook("payment.failed")
+        self.subscription.refresh_from_db()
+        self.subscription.last_payment_failed_notified_at = timezone.now() - timedelta(hours=25)
+        self.subscription.save(update_fields=["last_payment_failed_notified_at"])
+
+        self._post_webhook("payment.failed")
+
+        self.assertEqual(len(mail.outbox), 2)
 
 
 GiB = 1024 * 1024 * 1024

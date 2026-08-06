@@ -39,6 +39,14 @@ class Subscription(models.Model):
     a parallel vocabulary — keeps webhook handling a straight pass-through.
     """
 
+    # Statuses where a Razorpay mandate is still alive -- either not yet
+    # authenticated by the customer, or already collecting. Used by
+    # create_user_subscription to decide whether the checkout page should
+    # reuse/reject instead of minting a second live mandate for the same
+    # user. Plain tuple, matching how `status` itself already mirrors
+    # Razorpay's vocabulary directly rather than a parallel enum.
+    LIVE_STATUSES = ("created", "authenticated", "active", "paused")
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="subscriptions"
     )
@@ -61,6 +69,16 @@ class Subscription(models.Model):
         null=True, blank=True,
         help_text="Files still over the Free limit get deleted after this (30 days post-cancellation).",
     )
+
+    # Dedupe window for the payment.failed notice -- see
+    # RazorpaySubscriptionWebhookView.post(). Razorpay redelivers webhooks
+    # (retries on any non-2xx, and duplicates land even on a 200); without
+    # this, every redelivery of the SAME failure would resend the email.
+    # A time window, not a boolean, so it self-resets: a genuinely NEW
+    # failure on a later billing cycle is always weeks away, well past any
+    # realistic redelivery window, and gets its own notice with nothing
+    # needing to explicitly clear a flag first.
+    last_payment_failed_notified_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.user} -> {self.plan} [{self.status}]"

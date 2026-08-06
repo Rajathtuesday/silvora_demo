@@ -16,7 +16,7 @@ from users.models import User, UserQuota
 from .models import RazorpayPlan, Subscription
 from .serializers import CreateSubscriptionSerializer
 from .services.razorpay_client import verify_webhook_signature
-from .services.subscription_service import PlanNotConfigured, create_user_subscription
+from .services.subscription_service import AlreadySubscribed, PlanNotConfigured, create_user_subscription
 from .services.web_link import make_billing_web_token, unsign_billing_web_token
 
 logger = logging.getLogger("silvora.billing")
@@ -77,6 +77,13 @@ def billing_checkout_page(request):
 
     try:
         subscription = create_user_subscription(user, tier, interval)
+    except AlreadySubscribed as e:
+        return render(request, "billing/checkout_error.html", {
+            "message": (
+                f"You already have a {e.subscription.status} subscription. "
+                "Manage or cancel your existing plan before starting a new one."
+            ),
+        }, status=409)
     except PlanNotConfigured:
         return render(request, "billing/checkout_error.html", {
             "message": "This plan isn't configured yet. Please try again shortly.",
@@ -99,11 +106,14 @@ class RazorpaySubscriptionWebhookView(APIView):
     """
     Public — Razorpay calls this directly, no user session. The signature is
     the only trust boundary, same pattern as the QR-payment webhook
-    elsewhere. No per-event idempotency tracking is needed here the way a
-    payment-ledger webhook would need it: every handler below either flips a
-    status field or calls UserQuota.set_tier(), and both are naturally
-    idempotent — applying the same event twice lands on the same end state,
-    not a duplicated side effect.
+    elsewhere. No per-event idempotency table is needed here the way a
+    payment-ledger webhook would need it: subscription.activated/charged
+    each flip a status field or call UserQuota.set_tier(), naturally
+    idempotent on their own. cancelled/completed and payment.failed are
+    different — they have a real side effect (an email) and mutable date
+    fields a naive handler would repeat on every redelivery, so those two
+    guard explicitly (a terminal-status check, and a notification
+    timestamp, respectively) before acting.
     """
 
     authentication_classes = []
@@ -153,25 +163,45 @@ class RazorpaySubscriptionWebhookView(APIView):
         elif event == "payment.failed":
             # Razorpay retries failed subscription charges on its own dunning
             # schedule. Deliberately NOT downgrading immediately here — see
-            # plan notes. Best-effort notify only.
-            user = subscription.user
-            if user.email:
-                try:
-                    send_mail(
-                        subject="Silvora payment failed",
-                        message=(
-                            "Your recent Silvora subscription payment didn't go through. "
-                            "Razorpay will retry automatically — please make sure your "
-                            "payment method is up to date to avoid any interruption."
-                        ),
-                        from_email=settings.DEFAULT_FROM_EMAIL,
-                        recipient_list=[user.email],
-                        fail_silently=True,
-                    )
-                except Exception as e:
-                    logger.error("Failed to send payment-failed notice to user %s: %s", user.id, e)
+            # plan notes. Best-effort notify only — but at most once per 24h,
+            # so webhook redelivery of the SAME failure can't resend this an
+            # unbounded number of times (a genuinely new failure is always
+            # at least one billing cycle away, so this window can never
+            # swallow a real one).
+            now = timezone.now()
+            already_notified_recently = (
+                subscription.last_payment_failed_notified_at is not None
+                and now - subscription.last_payment_failed_notified_at < timedelta(hours=24)
+            )
+            if not already_notified_recently:
+                user = subscription.user
+                if user.email:
+                    try:
+                        send_mail(
+                            subject="Silvora payment failed",
+                            message=(
+                                "Your recent Silvora subscription payment didn't go through. "
+                                "Razorpay will retry automatically — please make sure your "
+                                "payment method is up to date to avoid any interruption."
+                            ),
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[user.email],
+                            fail_silently=True,
+                        )
+                    except Exception as e:
+                        logger.error("Failed to send payment-failed notice to user %s: %s", user.id, e)
+                subscription.last_payment_failed_notified_at = now
+                subscription.save(update_fields=["last_payment_failed_notified_at"])
 
         elif event in ("subscription.cancelled", "subscription.completed"):
+            # Idempotent against redelivery: once this subscription has
+            # already landed in EITHER terminal state, a redelivered
+            # cancelled/completed event is a pure duplicate. Without this,
+            # grace_ends_at/purge_at get pushed further into the future on
+            # every retry and the "subscription ended" email resends every time.
+            if subscription.status in ("cancelled", "completed"):
+                return Response({"ok": True})
+
             # Deliberately NOT downgrading immediately. The user keeps their
             # paid limit for 7 days (real time to download anything over the
             # free tier), then gets downgraded to Free, then gets a further
