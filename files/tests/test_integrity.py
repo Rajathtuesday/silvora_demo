@@ -109,6 +109,46 @@ class IntegrityUploadTests(APITestCase):
         file.refresh_from_db()
         self.assertEqual(file.upload_state, FileRecord.UploadState.COMMITTED)
 
+    @patch("files.services.upload_service.QuotaService")
+    @patch("files.services.upload_service.StorageGateway")
+    def test_commit_marks_integrity_established(self, mock_storage_cls, mock_quota):
+        storage = mock_storage_cls.return_value
+        storage.list_chunk_objects.return_value = [("0", "k0", 100)]
+        storage.exists.return_value = True
+        mock_quota.consume.return_value = True
+
+        file = self._make_uploading_file()
+        self.client.post(f"/file/{file.id}/commit/")
+
+        file.refresh_from_db()
+        self.assertTrue(file.integrity_established)
+
+    @patch("files.services.upload_service.QuotaService")
+    @patch("files.services.upload_service.StorageGateway")
+    def test_failed_commit_does_not_set_integrity_established(self, mock_storage_cls, mock_quota):
+        storage = mock_storage_cls.return_value
+        storage.list_chunk_objects.return_value = [("0", "k0", 100)]
+        storage.exists.return_value = False  # gate fails
+        file = self._make_uploading_file()
+        self.client.post(f"/file/{file.id}/commit/")
+
+        file.refresh_from_db()
+        self.assertFalse(file.integrity_established)
+
+    @patch("files.services.upload_service.StorageGateway")
+    def test_recommitting_already_committed_file_does_not_backfill(self, mock_storage_cls):
+        """Guards the no-retroactive-rewriting decision directly."""
+        file = self._make_uploading_file()
+        file.upload_state = FileRecord.UploadState.COMMITTED
+        file.integrity_established = False  # simulates a pre-migration row
+        file.save(update_fields=["upload_state", "integrity_established"])
+
+        res = self.client.post(f"/file/{file.id}/commit/")
+
+        self.assertEqual(res.json()["status"], "already_committed")
+        file.refresh_from_db()
+        self.assertFalse(file.integrity_established)
+
 
 class IntegrityDownloadTests(APITestCase):
     def setUp(self):
@@ -146,6 +186,19 @@ class IntegrityDownloadTests(APITestCase):
         self.client.force_authenticate(self.alice)
         res = self.client.get(f"/download/file/{self.file.id}/integrity/")
         self.assertEqual(res.status_code, 404)
+
+    @patch("files.views.StorageGateway")
+    def test_missing_integrity_after_being_established_fails_closed(self, mock_storage_cls):
+        self.file.integrity_established = True
+        self.file.save(update_fields=["integrity_established"])
+        storage = mock_storage_cls.return_value
+        storage.exists.return_value = False
+
+        self.client.force_authenticate(self.alice)
+        res = self.client.get(f"/download/file/{self.file.id}/integrity/")
+
+        self.assertEqual(res.status_code, 409)
+        self.assertTrue(res.json()["integrity_established"])
 
     @patch("files.views.StorageGateway")
     def test_other_tenant_cannot_fetch_integrity(self, mock_storage_cls):

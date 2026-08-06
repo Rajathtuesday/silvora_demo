@@ -196,8 +196,11 @@ def delete_file(request, file_id):
 @throttle_classes([FileMutateThrottle])
 def restore_file(request, file_id):
     with transaction.atomic():
+        # select_for_update: closes a race against purge_trashed_files (the
+        # daily cron). Without a row lock here, the cron could act on this
+        # row between this transaction's read and its commit.
         file = get_object_or_404(
-            FileRecord, id=file_id, owner=request.user,
+            FileRecord.objects.select_for_update(), id=file_id, owner=request.user,
             tenant=request.user.tenant, deleted_at__isnull=False,
         )
         QuotaService.get_or_create_user_quota(request.user)
@@ -301,6 +304,16 @@ def download_integrity(request, file_id):
     base = r2_base(file.tenant_id, file.owner_id, file.id)
     key = integrity_key(base)
     if not storage.exists(key):
+        if file.integrity_established:
+            # UploadService.commit() proved a manifest existed for this file.
+            # It's gone now -- not a legacy file, tamper/deletion after the
+            # fact. Fail closed with a status the client can't confuse with
+            # "never had one" (see IntegrityService.fetch on the client --
+            # only 404 means legacy; anything else, including this 409, throws).
+            return Response(
+                {"error": "Integrity manifest missing", "integrity_established": True},
+                status=409,
+            )
         return Response({"error": "Integrity manifest not found"}, status=404)
     return HttpResponse(storage.download_bytes(key), content_type="application/octet-stream")
 

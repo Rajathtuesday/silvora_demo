@@ -48,6 +48,16 @@ class FileRecord(models.Model):
     final_path = models.CharField(max_length=1024, null=True, blank=True)
     manifest_path = models.CharField(max_length=1024, null=True, blank=True)
 
+    # Set exactly once, inside UploadService.commit(), at the moment the
+    # existing integrity-manifest gate passes. A durable, tamper-evident
+    # proof that this file HAD a manifest at commit time -- unlike checking
+    # "does integrity.bin exist in storage right now", a compromised server
+    # can't rewrite this after the fact without DB access. Never backfilled
+    # for rows that predate this field -- doing so would mean re-deriving it
+    # from current storage state, exactly the falsifiable signal this field
+    # exists to replace.
+    integrity_established = models.BooleanField(default=False)
+
     storage_type = models.CharField(
         max_length=10,
         default=STORAGE_R2,

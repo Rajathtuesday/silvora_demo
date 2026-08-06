@@ -330,12 +330,14 @@ class UploadService:
         file.upload_state = FileRecord.UploadState.COMMITTED
         file.final_path = base
         file.manifest_path = manifest_key
+        file.integrity_established = True  # proven by the gate above; durable even if integrity.bin is deleted later
 
         file.save(update_fields=[
             "size",
             "upload_state",
             "final_path",
             "manifest_path",
+            "integrity_established",
         ])
 
         return {"status": "committed"}, 200

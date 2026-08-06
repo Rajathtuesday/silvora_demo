@@ -64,3 +64,37 @@ services:
         sync: false
       - key: EMAIL_PASSWORD
         sync: false
+
+  # Runs once a day: permanently erases FileRecords whose Trash retention
+  # period (purge_after, set 7 days out by mark_deleted() when a file is
+  # moved to Trash) has elapsed. See files/management/commands/
+  # purge_trashed_files.py. Offset an hour after the billing grace-period
+  # cron purely for operational tidiness (separate log windows, avoids both
+  # jobs hitting the free-tier Postgres connection limit at the exact same
+  # minute) -- there's no correctness dependency between them, they touch
+  # disjoint rows (deleted_at IS NULL vs IS NOT NULL).
+  - type: cron
+    name: silvora-trash-purge
+    runtime: python
+    plan: free
+    schedule: "0 4 * * *"  # 04:00 UTC daily
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python manage.py purge_trashed_files"
+    envVars:
+      - fromService:
+          type: web
+          name: silvora-backend
+          envVarKey: DJANGO_SECRET_KEY
+        key: DJANGO_SECRET_KEY
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
