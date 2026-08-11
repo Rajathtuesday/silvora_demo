@@ -39,7 +39,7 @@ services:
     name: silvora-grace-period-check
     runtime: python
     plan: free
-    schedule: "0 3 * * *"  # 03:00 UTC daily — low-traffic hours
+    schedule: "0 3 * * *"  # 03:00 UTC daily, low-traffic hours
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python manage.py process_subscription_grace_periods"
     envVars:
