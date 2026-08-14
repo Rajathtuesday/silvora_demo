@@ -12,6 +12,9 @@
 <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon/favicon-16x16.png' %}">
 <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
 <link rel="manifest" href="{% static 'favicon/site.webmanifest' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 
 <!-- CRITICAL SEO META TAGS -->
 <meta name="description" content="Silvora Cloud is a secure End-to-End Encrypted (E2EE) cloud storage service, built and hosted in India. Your data is private, safe, and sovereign.">
@@ -55,18 +58,22 @@
 
 <style>
 :root {
-  --bg: #0d0d12;
+  /* Same tokens as the Flutter app's silvora_theme.dart, one brand, not a
+     separate marketing-site look. */
+  --bg: #080910;
   --text: #f5f5f7;
   --accent: #5B4FE8;
-  --accent-soft: rgba(91, 79, 232, 0.45);
+  --accent-soft: rgba(91, 79, 232, 0.16);
   --gold: #D4AF6A;
-  --glass: rgba(255, 255, 255, 0.05);
+  --card: #141620;
+  --border: rgba(255,255,255,0.08);
+  --font-display: "Syne", sans-serif;
 }
 
 /* Global */
 body {
   margin: 0;
-  font-family: "Inter", sans-serif;
+  font-family: "DM Sans", sans-serif;
   background: var(--bg);
   color: var(--text);
   overflow-x: hidden;
@@ -74,24 +81,11 @@ body {
 
 h1, h2, h3 {
   margin: 0;
+  font-family: var(--font-display);
 }
 
 section {
   padding: 90px 8vw;
-}
-
-/* Glow */
-.glow {
-  position: fixed;
-  width: 1200px;
-  height: 1200px;
-  top: -30%;
-  left: 50%;
-  transform: translateX(-50%);
-  background: radial-gradient(circle, var(--accent-soft), transparent 60%);
-  filter: blur(200px);
-  opacity: .18;
-  pointer-events: none;
 }
 
 /* Nav */
@@ -102,6 +96,7 @@ section {
   align-items: center;
 }
 .logo {
+  font-family: var(--font-display);
   font-size: 1.6rem;
   font-weight: 700;
   text-decoration: none;
@@ -131,8 +126,9 @@ section {
   padding-top: 140px;
 }
 .hero-title {
+  font-family: var(--font-display);
   font-size: clamp(2.6rem, 5vw, 4.5rem);
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
 }
 .highlight { color: var(--accent); }
@@ -146,7 +142,7 @@ section {
 
 /* SEO Definition Box - Explicitly answers "What is Silvora Cloud?" */
 .seo-definition {
-  background: rgba(146, 85, 232, 0.08);
+  background: var(--accent-soft);
   border-left: 4px solid var(--accent);
   padding: 22px 28px;
   margin: 40px auto;
@@ -212,16 +208,14 @@ section {
   margin-top: 40px;
 }
 .feature {
-  background: var(--glass);
+  background: var(--card);
+  border: 1px solid var(--border);
   padding: 32px;
   border-radius: 14px;
-  backdrop-filter: blur(12px);
   text-align: center;
   line-height: 1.6;
-  opacity: 0;
-  transform: translateY(40px);
 }
-.feature h3 { color: var(--accent); margin-bottom: 12px; }
+.feature h3 { font-family: var(--font-display); color: var(--accent); margin-bottom: 12px; }
 
 /* Pricing */
 .pricing-grid {
@@ -232,13 +226,11 @@ section {
   margin: 0 auto;
 }
 .plan {
-  background: var(--glass);
-  border: 1px solid rgba(255,255,255,.08);
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 32px 28px;
   position: relative;
-  opacity: 0;
-  transform: translateY(40px);
 }
 .plan-premium {
   border-color: rgba(212,175,106,.45);
@@ -281,17 +273,18 @@ section {
   gap: 36px;
 }
 .uc {
-  background: var(--glass);
+  background: var(--card);
+  border: 1px solid var(--border);
   padding: 28px;
   border-radius: 14px;
-  opacity: 0;
-  transform: translateY(40px);
 }
+.uc h3 { font-family: var(--font-display); }
 .uc p { opacity: .75; }
 
 /* CTA block */
 .cta-block {
-  background: var(--glass);
+  background: var(--card);
+  border: 1px solid var(--border);
   text-align: center;
   padding: 80px 10vw;
   border-radius: 20px;
@@ -330,8 +323,8 @@ footer a {
 .modal-bg.active { display: flex; }
 
 .modal {
-  background: var(--glass);
-  border: 1px solid rgba(255,255,255,.08);
+  background: var(--card);
+  border: 1px solid var(--border);
   width: 90%;
   max-width: 650px;
   border-radius: 16px;
@@ -365,13 +358,6 @@ footer a {
 }
 .close-btn:hover { opacity: 1; }
 
-/* Reveal */
-.reveal {
-  opacity: 1 !important;
-  transform: translateY(0) !important;
-  transition: .65s ease-out;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
   .nav { flex-direction: column; gap: 20px; }
@@ -383,7 +369,6 @@ footer a {
 </head>
 
 <body>
-<div class="glow"></div>
 
 <header class="nav">
   <a href="/" class="logo">Silvora<span class="dot">.</span></a>
@@ -477,12 +462,6 @@ footer a {
 </footer>
 
 <script>
-// reveal animation
-const obs = new IntersectionObserver(entries => {
-  entries.forEach(e => e.isIntersecting && e.target.classList.add("reveal"));
-});
-document.querySelectorAll('.feature,.uc,.plan').forEach(f => obs.observe(f));
-
 // Smooth scroll for anchor links
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   anchor.addEventListener('click', function(e) {
