@@ -4,7 +4,8 @@ from django.core.management.base import BaseCommand
 from django.core.mail import send_mail
 from django.utils import timezone
 
-from billing.models import Subscription
+from billing.models import PlayBillingSubscription, Subscription
+from billing.services.cross_provider import has_active_subscription
 from users.models import SubscriptionTier, UserQuota
 from files.models import FileRecord
 from files.services.quota_service import QuotaService
@@ -18,32 +19,35 @@ class Command(BaseCommand):
 
     Cancelling a subscription doesn't downgrade anyone immediately
     (billing/views.py sets grace_ends_at/purge_at on the cancellation
-    webhook instead). This command is what actually acts on those two
-    dates:
+    webhook instead, same for Play via play_purchase_service.sync_subscription_state).
+    This command is what actually acts on those two dates, across BOTH
+    providers' tables:
       - grace_ends_at reached -> downgrade to Free (existing files stay,
         just can't add more while over the new limit).
       - purge_at reached, still over the Free limit -> permanently delete
         the oldest files until back under 1GB.
     Both checks skip a subscription if the user has since started a new
-    active one — a resubscription already took precedence via the
-    subscription.activated webhook.
+    active one, on EITHER provider — a resubscription already took
+    precedence via that provider's own activation path.
     """
     help = "Downgrade/purge accounts whose cancelled subscription's grace period has elapsed."
 
     def handle(self, *args, **options):
         now = timezone.now()
-        downgraded = self._process_downgrades(now)
-        purged = self._process_purges(now)
+        downgraded = self._process_downgrades(now, Subscription)
+        downgraded += self._process_downgrades(now, PlayBillingSubscription)
+        purged = self._process_purges(now, Subscription)
+        purged += self._process_purges(now, PlayBillingSubscription)
         self.stdout.write(self.style.SUCCESS(
             f"Downgraded {downgraded} subscription(s), purged files for {purged} user(s)."
         ))
 
     def _has_active_subscription(self, user):
-        return Subscription.objects.filter(user=user, status="active").exists()
+        return has_active_subscription(user)
 
-    def _process_downgrades(self, now):
+    def _process_downgrades(self, now, model):
         count = 0
-        qs = Subscription.objects.filter(
+        qs = model.objects.filter(
             grace_ends_at__isnull=False,
             grace_ends_at__lte=now,
         ).select_related("user")
@@ -83,9 +87,9 @@ class Command(BaseCommand):
                     pass
         return count
 
-    def _process_purges(self, now):
+    def _process_purges(self, now, model):
         count = 0
-        qs = Subscription.objects.filter(
+        qs = model.objects.filter(
             purge_at__isnull=False,
             purge_at__lte=now,
         ).select_related("user")

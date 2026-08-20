@@ -305,3 +305,21 @@ PRIVACY_POLICY_VERSION = "2026-06-26"
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
 RAZORPAY_WEBHOOK_SECRET = os.environ.get("RAZORPAY_WEBHOOK_SECRET", "")
+
+# =====================================================
+# 🤖 GOOGLE PLAY BILLING (parallel to Razorpay -- required alongside it by
+# Google's India Alternative Billing policy, not a replacement for it)
+# =====================================================
+GOOGLE_PLAY_PACKAGE_NAME = os.environ.get("GOOGLE_PLAY_PACKAGE_NAME", "cloud.silvora.app")
+
+# Either the raw JSON content (practical for a host like Render, where only
+# env vars, not mounted files, are easy to set) or a path to a key file
+# (for local dev). No hardcoded fallback for either -- same no-committed-
+# secret principle as DJANGO_SECRET_KEY above.
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON", "")
+GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH = os.environ.get("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH", "")
+
+# Must match exactly what's configured on the Pub/Sub push subscription
+# that delivers Real-time developer notifications to /api/billing/play/rtdn/.
+PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL = os.environ.get("PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL", "")
+PUBSUB_PUSH_AUDIENCE = os.environ.get("PUBSUB_PUSH_AUDIENCE", "")

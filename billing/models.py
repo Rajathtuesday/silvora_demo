@@ -82,3 +82,102 @@ class Subscription(models.Model):
 
     def __str__(self):
         return f"{self.user} -> {self.plan} [{self.status}]"
+
+
+class PlayBillingPlan(models.Model):
+    """
+    Config, not a log — same role as RazorpayPlan, but Play Billing's data
+    model is one subscription *product* per offering containing one or more
+    *base plans* (each with its own billing period), not a flat plan-id-per-
+    interval. Maps (tier, interval) -> (play_product_id, play_base_plan_id).
+    Rows entered by hand via Django admin after creating the matching
+    product/base plan in Play Console — same convention as RazorpayPlan, the
+    ids can't be invented locally. No amount_paise: Play prices are
+    authoritative per-country in Play Console, this app never sets them.
+    """
+
+    tier = models.CharField(max_length=20, choices=SubscriptionTier.choices)
+    interval = models.CharField(max_length=10, choices=RazorpayPlan.Interval.choices)
+    play_product_id = models.CharField(max_length=100, help_text="e.g. silvora_pro")
+    play_base_plan_id = models.CharField(max_length=100, help_text="e.g. pro-monthly")
+
+    class Meta:
+        unique_together = ("tier", "interval")
+        constraints = [
+            models.UniqueConstraint(
+                fields=["play_product_id", "play_base_plan_id"],
+                name="unique_play_product_base_plan",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.tier} / {self.interval} ({self.play_product_id}/{self.play_base_plan_id})"
+
+
+class PlayBillingSubscription(models.Model):
+    """
+    One row per Google Play purchase token a user has active or has had.
+    `status` mirrors Google's own `subscriptionState` enum from the Android
+    Publisher Subscriptions v2 API directly (SUBSCRIPTION_STATE_ACTIVE /
+    _PAUSED / _IN_GRACE_PERIOD / _ON_HOLD / _CANCELED / _EXPIRED / etc.)
+    rather than inventing a parallel vocabulary — same reasoning as
+    Subscription.status mirroring Razorpay's own values.
+
+    Deliberately a separate model from Subscription rather than a shared
+    base class: Play's status vocabulary has different transition semantics
+    (e.g. CANCELED here means "auto-renew off, still entitled until expiry",
+    not "over now" the way Razorpay's cancelled is treated) — forcing both
+    into one shape would mangle one vocabulary into the other's, worse than
+    two self-contained models.
+    """
+
+    # Everything except EXPIRED / PENDING_PURCHASE_CANCELED. CANCELED is
+    # deliberately included — a user who turned off auto-renew is still
+    # entitled until expiry, so it still counts as "an in-flight mandate"
+    # for the double-subscription guard, same reason Subscription's
+    # LIVE_STATUSES includes "paused".
+    LIVE_STATUSES = (
+        "SUBSCRIPTION_STATE_PENDING",
+        "SUBSCRIPTION_STATE_ACTIVE",
+        "SUBSCRIPTION_STATE_PAUSED",
+        "SUBSCRIPTION_STATE_IN_GRACE_PERIOD",
+        "SUBSCRIPTION_STATE_ON_HOLD",
+        "SUBSCRIPTION_STATE_CANCELED",
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="play_subscriptions"
+    )
+    plan = models.ForeignKey(PlayBillingPlan, on_delete=models.PROTECT)
+
+    # Play's own opaque purchase identifier — this is what the RTDN webhook
+    # looks rows up by, and what the client submits to the verify endpoint.
+    purchase_token = models.CharField(max_length=500, unique=True)
+
+    # Audit trail only — business logic never reads these, "most recent live
+    # row wins" same as Subscription.
+    linked_purchase_token = models.CharField(max_length=500, null=True, blank=True)
+    order_id = models.CharField(max_length=100, null=True, blank=True)
+
+    status = models.CharField(max_length=40, default="SUBSCRIPTION_STATE_UNSPECIFIED")
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    # Identical semantics to Subscription's fields of the same name — see
+    # that model's docstring. Both null means "not in a cancellation flow."
+    grace_ends_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Downgrade to Free happens after this (7 days post-expiry).",
+    )
+    purge_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Files still over the Free limit get deleted after this (30 days post-expiry).",
+    )
+
+    # Same throttle purpose as Subscription.last_payment_failed_notified_at,
+    # renamed since the trigger here is Play's own IN_GRACE_PERIOD state,
+    # not a "payment.failed" event name.
+    last_payment_issue_notified_at = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.user} -> {self.plan} [{self.status}]"

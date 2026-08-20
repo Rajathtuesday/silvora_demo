@@ -7,6 +7,7 @@ The app only ever asks for a signed link to here; this is where the actual
 Razorpay subscription gets created.
 """
 from ..models import RazorpayPlan, Subscription
+from .cross_provider import get_live_subscription
 from .razorpay_client import create_subscription
 
 
@@ -15,14 +16,19 @@ class PlanNotConfigured(Exception):
 
 
 class AlreadySubscribed(Exception):
-    """Raised instead of creating a second live Razorpay mandate for a user
-    who already has one authenticated/active/paused. `subscription` is the
-    existing live row, so callers can show which plan/status blocked it."""
-    def __init__(self, subscription: Subscription):
+    """Raised instead of creating a second live mandate for a user who
+    already has one, on EITHER provider (`subscription` may be a Razorpay
+    `Subscription` or a `PlayBillingSubscription` row -- see
+    cross_provider.py). `subscription` is the existing live row, so callers
+    can show which plan/status blocked it."""
+    def __init__(self, subscription):
         self.subscription = subscription
+        identifier = getattr(subscription, "razorpay_subscription_id", None) or getattr(
+            subscription, "purchase_token", None
+        )
         super().__init__(
             f"User {subscription.user_id} already has a {subscription.status} "
-            f"subscription ({subscription.razorpay_subscription_id})"
+            f"subscription ({identifier})"
         )
 
 
@@ -56,6 +62,14 @@ def create_user_subscription(user, tier: str, interval: str) -> Subscription:
         if live.plan_id == plan.id and live.status == "created":
             return live
         raise AlreadySubscribed(live)
+
+    # A live Play Billing mandate blocks a new Razorpay one the same way an
+    # existing live Razorpay row does above -- without this, a user with an
+    # active Play subscription could open the website checkout and mint a
+    # second, real, paying mandate through the other provider.
+    live_elsewhere = get_live_subscription(user)
+    if live_elsewhere and live_elsewhere.provider == "play":
+        raise AlreadySubscribed(live_elsewhere.subscription)
 
     rzp_subscription = create_subscription(plan.razorpay_plan_id)
 
