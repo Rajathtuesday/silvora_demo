@@ -453,14 +453,14 @@ footer a {
 .close-btn:hover { opacity: 1; }
 
 /* Motion & interaction */
-.feature, .uc, .plan {
+.feature, .uc, .plan, .seo-definition, .cta-block {
   position: relative;
   overflow: hidden;
   opacity: 0;
   transform: translateY(24px);
   transition: opacity .6s ease, transform .6s ease;
 }
-.feature.in-view, .uc.in-view, .plan.in-view {
+.feature.in-view, .uc.in-view, .plan.in-view, .seo-definition.in-view, .cta-block.in-view {
   opacity: 1;
   transform: translateY(0);
 }
@@ -480,7 +480,7 @@ footer a {
 .feature:hover::before, .uc:hover::before, .plan:hover::before { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-  .feature, .uc, .plan { opacity: 1; transform: none; transition: none; }
+  .feature, .uc, .plan, .seo-definition, .cta-block { opacity: 1; transform: none; transition: none; }
   .line { opacity: 1; animation: none; }
 }
 
@@ -705,7 +705,7 @@ const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').match
 })();
 
 (function scrollReveal() {
-  const targets = document.querySelectorAll('.feature, .uc, .plan');
+  const targets = document.querySelectorAll('.feature, .uc, .plan, .seo-definition, .cta-block');
   if (!('IntersectionObserver' in window)) {
     targets.forEach(t => t.classList.add('in-view'));
     return;
