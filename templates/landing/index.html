@@ -120,6 +120,19 @@ section {
 .nav a.active { opacity: 1; color: var(--accent); }
 .nav-download { padding: 10px 22px !important; font-size: 0.9rem; }
 
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid transparent;
+  transition: background .3s ease, border-color .3s ease;
+}
+.nav.scrolled {
+  background: rgba(8,9,16,0.82);
+  backdrop-filter: blur(14px);
+  border-bottom-color: var(--border);
+}
+
 /* Hero */
 .hero {
   text-align: center;
@@ -138,6 +151,87 @@ section {
   opacity: 0.85;
   line-height: 1.6;
   font-size: 1.1rem;
+}
+
+.hero {
+  position: relative;
+  overflow: hidden;
+}
+.hero > * {
+  position: relative;
+  z-index: 1;
+}
+.hero-network {
+  position: absolute;
+  top: -60px;
+  left: -8vw;
+  right: -8vw;
+  width: calc(100% + 16vw);
+  height: 620px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.6;
+}
+.line {
+  display: inline-block;
+  opacity: 0;
+  animation: heroLineIn .7s ease forwards;
+  animation-delay: var(--d, 0s);
+}
+@keyframes heroLineIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.cipher-demo {
+  max-width: 520px;
+  margin: 46px auto 0;
+  text-align: left;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 24px;
+}
+.cipher-demo-label {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+.cipher-input {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: "DM Sans", sans-serif;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+.cipher-input:focus { outline: none; border-color: var(--accent); }
+.cipher-output {
+  margin-top: 12px;
+  font-family: Consolas, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.85rem;
+  color: var(--accent);
+  word-break: break-all;
+  min-height: 1.4em;
+  opacity: 0.95;
+}
+.cipher-output .cipher-caret {
+  color: var(--text);
+  opacity: 0.4;
+  font-family: "DM Sans", sans-serif;
+  font-style: italic;
+}
+.cipher-demo-note {
+  margin-top: 12px;
+  font-size: 0.78rem;
+  opacity: 0.55;
+  line-height: 1.5;
 }
 
 /* SEO Definition Box - Explicitly answers "What is Silvora Cloud?" */
@@ -358,12 +452,46 @@ footer a {
 }
 .close-btn:hover { opacity: 1; }
 
+/* Motion & interaction */
+.feature, .uc, .plan {
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity .6s ease, transform .6s ease;
+}
+.feature.in-view, .uc.in-view, .plan.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+.features .feature:nth-child(2), .usecases .uc:nth-child(2), .pricing-grid .plan:nth-child(2) { transition-delay: .08s; }
+.features .feature:nth-child(3), .usecases .uc:nth-child(3), .pricing-grid .plan:nth-child(3) { transition-delay: .16s; }
+.features .feature:nth-child(4), .usecases .uc:nth-child(4), .pricing-grid .plan:nth-child(4) { transition-delay: .24s; }
+
+.feature::before, .uc::before, .plan::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(240px circle at var(--mx,50%) var(--my,50%), rgba(91,79,232,0.14), transparent 60%);
+  opacity: 0;
+  transition: opacity .3s ease;
+  pointer-events: none;
+}
+.feature:hover::before, .uc:hover::before, .plan:hover::before { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .feature, .uc, .plan { opacity: 1; transform: none; transition: none; }
+  .line { opacity: 1; animation: none; }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .nav { flex-direction: column; gap: 20px; }
   .nav-links { gap: 18px; }
   section { padding: 60px 5vw; }
   .hero { padding-top: 100px; }
+  .hero-network { height: 460px; }
+  .cipher-demo { margin-left: 4vw; margin-right: 4vw; }
 }
 </style>
 </head>
@@ -382,10 +510,11 @@ footer a {
 </header>
 
 <section class="hero">
+  <canvas class="hero-network" id="hero-network" aria-hidden="true"></canvas>
   <h1 class="hero-title">
-    Your files.<br>
-    <span class="highlight">Encrypted by you.</span><br>
-    Only for you.
+    <span class="line" style="--d:0s">Your files.</span><br>
+    <span class="highlight decrypt" id="decrypt-line" data-text="Encrypted by you.">Encrypted by you.</span><br>
+    <span class="line" style="--d:.5s">Only for you.</span>
   </h1>
 
   <!-- EXPLICIT DEFINITION FOR SEO/AI -->
@@ -401,6 +530,13 @@ footer a {
   </p>
   <a class="btn" href="{% static 'downloads/silvora.apk' %}">Download for Android</a>
   <div class="play-store-note">Coming soon to Google Play, download the APK directly for now.</div>
+
+  <div class="cipher-demo">
+    <div class="cipher-demo-label">Try it</div>
+    <input type="text" id="cipher-input" class="cipher-input" placeholder="Type anything, e.g. a diary entry" maxlength="60" autocomplete="off">
+    <div class="cipher-output" id="cipher-output"><span class="cipher-caret">Your encrypted output appears here</span></div>
+    <div class="cipher-demo-note">Illustrative only, run entirely in your browser. Nothing you type here is sent anywhere. Real files are encrypted on your device with XChaCha20-Poly1305 before they ever leave it.</div>
+  </div>
 </section>
 
 <section id="features">
@@ -477,6 +613,138 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     }
   });
 });
+
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+(function navScroll() {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+(function decryptReveal() {
+  const el = document.getElementById('decrypt-line');
+  if (!el || reduceMotion) return;
+  const target = el.dataset.text;
+  const glyphs = '#$%&*+=<>/\\|~^01';
+  const totalFrames = 24;
+  let frame = 0;
+  function tick() {
+    frame++;
+    let out = '';
+    for (let i = 0; i < target.length; i++) {
+      const ch = target[i];
+      if (ch === ' ') { out += ' '; continue; }
+      const revealAt = (i / target.length) * totalFrames + totalFrames * 0.4;
+      out += frame >= revealAt ? ch : glyphs[Math.floor(Math.random() * glyphs.length)];
+    }
+    el.textContent = out;
+    if (frame < totalFrames) requestAnimationFrame(tick);
+    else el.textContent = target;
+  }
+  requestAnimationFrame(tick);
+})();
+
+(function heroNetwork() {
+  const canvas = document.getElementById('hero-network');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let w, h, nodes;
+
+  function resize() {
+    w = canvas.width = canvas.offsetWidth * dpr;
+    h = canvas.height = canvas.offsetHeight * dpr;
+  }
+  function makeNodes() {
+    const count = Math.min(Math.round((w * h) / (28000 * dpr * dpr)), 60);
+    nodes = Array.from({ length: count }, () => ({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.25,
+      vy: (Math.random() - 0.5) * 0.25,
+      gold: Math.random() < 0.12
+    }));
+  }
+  function frame() {
+    ctx.clearRect(0, 0, w, h);
+    for (const n of nodes) {
+      n.x += n.vx; n.y += n.vy;
+      if (n.x < 0 || n.x > w) n.vx *= -1;
+      if (n.y < 0 || n.y > h) n.vy *= -1;
+    }
+    const maxD = 160 * dpr;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < maxD) {
+          ctx.strokeStyle = `rgba(91,79,232,${0.18 * (1 - d / maxD)})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        }
+      }
+    }
+    for (const n of nodes) {
+      ctx.fillStyle = n.gold ? 'rgba(212,175,106,0.7)' : 'rgba(245,245,247,0.35)';
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, n.gold ? 2.4 : 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (!reduceMotion) requestAnimationFrame(frame);
+  }
+  resize();
+  makeNodes();
+  window.addEventListener('resize', () => { resize(); makeNodes(); });
+  frame();
+})();
+
+(function scrollReveal() {
+  const targets = document.querySelectorAll('.feature, .uc, .plan');
+  if (!('IntersectionObserver' in window)) {
+    targets.forEach(t => t.classList.add('in-view'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.2 });
+  targets.forEach(t => io.observe(t));
+})();
+
+(function cardCursorGlow() {
+  document.querySelectorAll('.feature, .plan, .uc').forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', `${e.clientX - r.left}px`);
+      card.style.setProperty('--my', `${e.clientY - r.top}px`);
+    });
+  });
+})();
+
+(function cipherDemo() {
+  const input = document.getElementById('cipher-input');
+  const output = document.getElementById('cipher-output');
+  if (!input || !output) return;
+  function pseudoEncrypt(str) {
+    let out = '';
+    for (let i = 0; i < str.length; i++) {
+      out += ((str.charCodeAt(i) ^ (i * 31 + 17)) & 0xff).toString(16).padStart(2, '0');
+    }
+    return out.match(/.{1,4}/g).join(' ');
+  }
+  input.addEventListener('input', () => {
+    output.innerHTML = input.value
+      ? pseudoEncrypt(input.value)
+      : '<span class="cipher-caret">Your encrypted output appears here</span>';
+  });
+})();
 </script>
 
 </body>
