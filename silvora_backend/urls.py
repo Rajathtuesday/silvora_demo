@@ -19,7 +19,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
+from django.templatetags.static import static as static_url
 from django.utils import timezone
 from .healthcheck import healthcheck
 from .legal import PrivacyPolicyView, TermsOfServiceView
@@ -80,6 +81,20 @@ def sitemap_xml(request):
     return HttpResponse(content, content_type='application/xml')
 
 
+def app_ads_txt(request):
+    # Empty on purpose, not a placeholder to fill in later: this app has no
+    # ad monetization, so the correct app-ads.txt is an explicit "nobody is
+    # authorized to sell ads for this app" (per the IAB spec), not a 404.
+    # An empty file states that; a missing file just leaves it ambiguous,
+    # which is exactly the gap ad fraud relies on. Play Console's own
+    # crawlers (AdsBot included) were re-checking for this on every visit.
+    return HttpResponse("", content_type='text/plain')
+
+
+def favicon_ico(request):
+    return HttpResponseRedirect(static_url('favicon/favicon.ico'))
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
 
@@ -89,6 +104,8 @@ urlpatterns = [
     # SEO
     path('robots.txt', robots_txt),
     path('sitemap.xml', sitemap_xml),
+    path('app-ads.txt', app_ads_txt),
+    path('favicon.ico', favicon_ico),
 
     # auth/token endpoints
     path('api/auth/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
