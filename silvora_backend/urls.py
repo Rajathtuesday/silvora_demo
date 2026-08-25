@@ -19,6 +19,8 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import HttpResponse
+from django.utils import timezone
 from .healthcheck import healthcheck
 from .legal import PrivacyPolicyView, TermsOfServiceView
 from .pages import LandingView
@@ -29,11 +31,64 @@ from billing.views import billing_checkout_page
 from rest_framework_simplejwt.views import TokenRefreshView
 from users.views import ThrottledTokenObtainPairView
 
+
+def robots_txt(request):
+    content = """User-agent: *
+
+# Public — the marketing and legal pages
+Allow: /
+Allow: /privacy/
+Allow: /terms/
+
+# Everything else is either an API, an authenticated app surface, or a
+# checkout link that only works with a signed token in the query string —
+# none of it is meant to be crawled or indexed.
+Disallow: /api/
+Disallow: /admin/
+Disallow: /admin-tools/
+Disallow: /billing/checkout/
+
+Sitemap: https://silvora.cloud/sitemap.xml"""
+    return HttpResponse(content, content_type='text/plain')
+
+
+def sitemap_xml(request):
+    # Public, indexable pages only. lastmod is generated fresh on every
+    # request rather than hand-typed, so it never goes stale.
+    today = timezone.localdate().isoformat()
+    content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://silvora.cloud/</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://silvora.cloud/privacy/</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+  <url>
+    <loc>https://silvora.cloud/terms/</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.3</priority>
+  </url>
+</urlset>"""
+    return HttpResponse(content, content_type='application/xml')
+
+
 urlpatterns = [
     path('admin/', admin.site.urls),
 
     # Landing page
     path('', LandingView.as_view(), name='landing'),
+
+    # SEO
+    path('robots.txt', robots_txt),
+    path('sitemap.xml', sitemap_xml),
 
     # auth/token endpoints
     path('api/auth/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
