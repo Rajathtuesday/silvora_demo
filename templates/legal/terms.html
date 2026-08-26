@@ -7,6 +7,9 @@
 <title>Terms of Service - Silvora</title>
 <link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
 <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #080910;
@@ -19,46 +22,77 @@
     --text-secondary: #8A8FAA;
     --text-muted: #4A4F6A;
     --border: #232639;
+    --font-display: "Syne", sans-serif;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: "DM Sans", sans-serif;
     line-height: 1.65;
   }
+  h1, h2, h3 { font-family: var(--font-display); }
+
+  /* Nav -- same structure/behavior as the landing page */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 28px 6vw;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid transparent;
+    transition: background .3s ease, border-color .3s ease;
+  }
+  .nav.scrolled {
+    background: rgba(8,9,16,0.82);
+    backdrop-filter: blur(14px);
+    border-bottom-color: var(--border);
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .dot { color: var(--primary); }
+  .nav-links { display: flex; gap: 24px; align-items: center; }
+  .nav-links a {
+    color: var(--text);
+    opacity: .8;
+    text-decoration: none;
+    transition: .25s;
+    font-size: 0.95rem;
+  }
+  .nav-links a:hover { opacity: 1; }
+  .nav-download {
+    padding: 10px 22px;
+    border-radius: 10px;
+    background: var(--primary);
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    opacity: 1 !important;
+  }
+  .nav-download:hover { opacity: .85 !important; }
+
   .wrap {
     max-width: 760px;
     margin: 0 auto;
     padding: 48px 24px 96px;
   }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-  }
-  .brand-logo {
-    width: 22px; height: 22px;
-    border-radius: 6px;
-    display: block;
-  }
-  .brand-name {
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--text);
-    font-size: 14px;
-    text-transform: uppercase;
-  }
   h1 {
-    font-size: 28px;
+    font-size: 32px;
+    font-weight: 700;
     margin: 18px 0 4px;
   }
   .updated {
     color: var(--text-muted);
     font-size: 13px;
     margin-bottom: 32px;
+    font-family: "DM Sans", sans-serif;
   }
   .card {
     background: var(--card);
@@ -78,7 +112,8 @@
   }
   .card.warn strong { color: #FFB84D; }
   h2 {
-    font-size: 18px;
+    font-size: 20px;
+    font-weight: 700;
     color: var(--text);
     margin: 36px 0 10px;
     padding-bottom: 8px;
@@ -86,6 +121,7 @@
   }
   h3 {
     font-size: 15px;
+    font-weight: 600;
     color: var(--primary-light);
     margin: 20px 0 6px;
   }
@@ -101,155 +137,231 @@
     padding: 1px 6px;
     font-size: 13px;
     color: var(--gold);
-  }a
+  }
+
+  /* Footer -- same structure/copy pattern as the landing page */
   footer {
+    text-align: center;
+    padding: 35px;
+    opacity: .5;
+    font-size: .9rem;
     margin-top: 48px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 13px;
+  }
+  footer a { color: inherit; text-decoration: underline; }
+
+  /* Scroll reveal -- same mechanism as the landing page, generic for
+     document content instead of card grids */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity .6s ease, transform .6s ease;
+  }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+  @media (max-width: 768px) {
+    .nav { padding: 20px 6vw; }
+    .nav-links { gap: 14px; }
+    .nav-links a:not(.nav-download) { display: none; }
   }
 </style>
 </head>
 <body>
+
+<header class="nav">
+  <a href="/" class="logo">Silvora<span class="dot">.</span></a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/#about">About</a>
+    <a href="/#features">Features</a>
+    <a href="/#pricing">Pricing</a>
+    <a class="nav-download" href="{% static 'downloads/silvora.apk' %}">Download for Android</a>
+  </div>
+</header>
+
 <div class="wrap">
 
-  <div class="brand">
-    <img src="{% static 'favicon/apple-touch-icon.png' %}" alt="Silvora" class="brand-logo">
-    <span class="brand-name">Silvora</span>
-  </div>
   <h1>Terms of Service</h1>
   <div class="updated">Last updated: 6 August 2026</div>
 
-  <div class="card beta">
+  <div class="card beta reveal">
     <strong>Beta software.</strong> Silvora is currently in a closed/limited beta,
     provided free of charge. Features, limits, and these terms may change as the
     product develops. We'll update this page if anything material changes.
   </div>
 
-  <p>
+  <p class="reveal">
     These Terms of Service ("Terms") govern your use of Silvora, a zero-knowledge,
     end-to-end encrypted (E2EE) file storage service ("Silvora", "we", "us"). By
     creating an account or using the app, you agree to these Terms. If you don't
     agree, please don't use Silvora.
   </p>
 
-  <h2>1. The service</h2>
-  <p>
-    Silvora lets you store files that are encrypted on your device before they're
-    uploaded. We operate the infrastructure that stores your encrypted data, but by
-    design we do not hold the keys needed to decrypt it. See our
-    <a href="/privacy/">Privacy Policy</a> for details on exactly what we can and
-    cannot see.
-  </p>
-
-  <h2>2. Your account</h2>
-  <ul>
-    <li>You must provide a valid email address and a password meeting our minimum
-      strength requirements to register.</li>
-    <li>You're responsible for keeping your login credentials and your device(s)
-      secure. Anyone with access to your unlocked device or your password and
-      recovery phrase can access your files.</li>
-    <li>You must be at least 13 years old to use Silvora.</li>
-  </ul>
-
-  <div class="card warn">
-    <strong>Your password and recovery phrase are the only way to decrypt your
-    files.</strong> Because Silvora is zero-knowledge, we never have access to your
-    encryption key. If you lose <em>both</em> your password and your 24-word
-    recovery phrase, your files are permanently and irrecoverably lost - there is
-    no "forgot password" support path that can restore them. Store your recovery
-    phrase somewhere safe.
+  <div class="reveal">
+    <h2>1. The service</h2>
+    <p>
+      Silvora lets you store files that are encrypted on your device before they're
+      uploaded. We operate the infrastructure that stores your encrypted data, but by
+      design we do not hold the keys needed to decrypt it. See our
+      <a href="/privacy/">Privacy Policy</a> for details on exactly what we can and
+      cannot see.
+    </p>
   </div>
 
-  <h2>3. Storage limits</h2>
-  <p>
-    Your account has a storage quota based on your plan (Free, Pro, or Enterprise,
-    as described in the app). During the beta, plans and limits may be adjusted; we
-    won't delete files to enforce a reduced quota retroactively without notice.
-  </p>
+  <div class="reveal">
+    <h2>2. Your account</h2>
+    <ul>
+      <li>You must provide a valid email address and a password meeting our minimum
+        strength requirements to register.</li>
+      <li>You're responsible for keeping your login credentials and your device(s)
+        secure. Anyone with access to your unlocked device or your password and
+        recovery phrase can access your files.</li>
+      <li>You must be at least 13 years old to use Silvora.</li>
+    </ul>
 
-  <h2>4. Subscriptions &amp; billing</h2>
-  <ul>
-    <li>Paid plans (Pro, Enterprise) are billed on a recurring basis, monthly
-      or yearly as selected, through Razorpay. Subscriptions renew
-      automatically at the end of each billing period until you cancel.</li>
-    <li>You can cancel at any time. Cancellation takes effect at the end of
-      your current billing period - you will not be charged again after
-      that.</li>
-    <li>After cancellation, you keep your plan's storage limit for 7 more
-      days, then your account moves to the free tier (your files stay put,
-      you just can't add more while over the free limit). Files still over
-      the free limit 30 days after cancellation are permanently deleted,
-      oldest first, down to the limit.</li>
-    <li>We don't offer refunds for partial billing periods. Cancelling stops
-      future charges but doesn't refund the period already paid for.</li>
-    <li>Subscribing happens through a secure Razorpay checkout page. Silvora
-      never receives or stores your card or UPI details directly - see our
-      <a href="/privacy/">Privacy Policy</a>.</li>
-  </ul>
+    <div class="card warn">
+      <strong>Your password and recovery phrase are the only way to decrypt your
+      files.</strong> Because Silvora is zero-knowledge, we never have access to your
+      encryption key. If you lose <em>both</em> your password and your 24-word
+      recovery phrase, your files are permanently and irrecoverably lost - there is
+      no "forgot password" support path that can restore them. Store your recovery
+      phrase somewhere safe.
+    </div>
+  </div>
 
-  <h2>5. Acceptable use</h2>
-  <p>You agree not to use Silvora to:</p>
-  <ul>
-    <li>Store or distribute content that is illegal under applicable law,
-      including child sexual abuse material, regardless of encryption.</li>
-    <li>Attempt to disrupt, overload, or gain unauthorized access to Silvora's
-      infrastructure or other users' accounts.</li>
-    <li>Use the service in a way that violates the rights of others.</li>
-  </ul>
-  <p>
-    Because file contents and filenames are encrypted on your device, we cannot
-    inspect what you store. If we become aware of a violation (for example, through
-    a valid legal order, abuse reports, or anomalous account activity), we may
-    suspend or terminate the account involved. We cannot decrypt or hand over file
-    contents we don't have access to.
-  </p>
+  <div class="reveal">
+    <h2>3. Storage limits</h2>
+    <p>
+      Your account has a storage quota based on your plan (Free, Pro, or Enterprise,
+      as described in the app). During the beta, plans and limits may be adjusted; we
+      won't delete files to enforce a reduced quota retroactively without notice.
+    </p>
+  </div>
 
-  <h2>6. Beta status - no uptime or data guarantees</h2>
-  <ul>
-    <li>Silvora is provided <strong>"as is"</strong> and <strong>"as available"</strong>,
-      without warranties of any kind, express or implied, including
-      merchantability, fitness for a particular purpose, or non-infringement.</li>
-    <li>As beta software, the service may have downtime, bugs, or data-affecting
-      issues. While we take backups and reliability seriously, you should not rely
-      on Silvora as your <em>only</em> copy of important files during the beta.</li>
-    <li>To the maximum extent permitted by law, Silvora and its operators are not
-      liable for any indirect, incidental, or consequential damages, or for loss
-      of data, arising from your use of the service.</li>
-  </ul>
+  <div class="reveal">
+    <h2>4. Subscriptions &amp; billing</h2>
+    <ul>
+      <li>Paid plans (Pro, Enterprise) are billed on a recurring basis, monthly
+        or yearly as selected, through Razorpay. Subscriptions renew
+        automatically at the end of each billing period until you cancel.</li>
+      <li>You can cancel at any time. Cancellation takes effect at the end of
+        your current billing period - you will not be charged again after
+        that.</li>
+      <li>After cancellation, you keep your plan's storage limit for 7 more
+        days, then your account moves to the free tier (your files stay put,
+        you just can't add more while over the free limit). Files still over
+        the free limit 30 days after cancellation are permanently deleted,
+        oldest first, down to the limit.</li>
+      <li>We don't offer refunds for partial billing periods. Cancelling stops
+        future charges but doesn't refund the period already paid for.</li>
+      <li>Subscribing happens through a secure Razorpay checkout page. Silvora
+        never receives or stores your card or UPI details directly - see our
+        <a href="/privacy/">Privacy Policy</a>.</li>
+    </ul>
+  </div>
 
-  <h2>7. Deleting your account &amp; data</h2>
-  <ul>
-    <li>You can permanently delete your account and all associated data at any
-      time from <strong>Settings → Delete Account</strong> in the app. This
-      removes your encrypted files from storage, your encryption key envelopes,
-      and your account record. This action is immediate and cannot be undone.</li>
-    <li>We may also terminate accounts that violate these Terms, with notice where
-      reasonably possible.</li>
-  </ul>
+  <div class="reveal">
+    <h2>5. Acceptable use</h2>
+    <p>You agree not to use Silvora to:</p>
+    <ul>
+      <li>Store or distribute content that is illegal under applicable law,
+        including child sexual abuse material, regardless of encryption.</li>
+      <li>Attempt to disrupt, overload, or gain unauthorized access to Silvora's
+        infrastructure or other users' accounts.</li>
+      <li>Use the service in a way that violates the rights of others.</li>
+    </ul>
+    <p>
+      Because file contents and filenames are encrypted on your device, we cannot
+      inspect what you store. If we become aware of a violation (for example, through
+      a valid legal order, abuse reports, or anomalous account activity), we may
+      suspend or terminate the account involved. We cannot decrypt or hand over file
+      contents we don't have access to.
+    </p>
+  </div>
 
-  <h2>8. Changes to these terms</h2>
-  <p>
-    We may update these Terms as Silvora moves from beta toward general
-    availability. Material changes will be reflected on this page with an updated
-    "Last updated" date, and where practical we'll notify testers directly.
-  </p>
+  <div class="reveal">
+    <h2>6. Beta status - no uptime or data guarantees</h2>
+    <ul>
+      <li>Silvora is provided <strong>"as is"</strong> and <strong>"as available"</strong>,
+        without warranties of any kind, express or implied, including
+        merchantability, fitness for a particular purpose, or non-infringement.</li>
+      <li>As beta software, the service may have downtime, bugs, or data-affecting
+        issues. While we take backups and reliability seriously, you should not rely
+        on Silvora as your <em>only</em> copy of important files during the beta.</li>
+      <li>To the maximum extent permitted by law, Silvora and its operators are not
+        liable for any indirect, incidental, or consequential damages, or for loss
+        of data, arising from your use of the service.</li>
+    </ul>
+  </div>
 
-  <h2>9. Governing law</h2>
-  <p>
-    These Terms are governed by the laws of India, without regard to conflict-of-law
-    principles.
-  </p>
+  <div class="reveal">
+    <h2>7. Deleting your account &amp; data</h2>
+    <ul>
+      <li>You can permanently delete your account and all associated data at any
+        time from <strong>Settings → Delete Account</strong> in the app. This
+        removes your encrypted files from storage, your encryption key envelopes,
+        and your account record. This action is immediate and cannot be undone.</li>
+      <li>We may also terminate accounts that violate these Terms, with notice where
+        reasonably possible.</li>
+    </ul>
+  </div>
 
-  <h2>10. Contact</h2>
-  <p>Questions about these Terms: <a href="mailto:rajath@rasova.net">rajath@rasova.net</a></p>
+  <div class="reveal">
+    <h2>8. Changes to these terms</h2>
+    <p>
+      We may update these Terms as Silvora moves from beta toward general
+      availability. Material changes will be reflected on this page with an updated
+      "Last updated" date, and where practical we'll notify testers directly.
+    </p>
+  </div>
 
-  <footer>
-    Silvora - zero-knowledge encrypted storage. See also our
-    <a href="/privacy/">Privacy Policy</a>.
-  </footer>
+  <div class="reveal">
+    <h2>9. Governing law</h2>
+    <p>
+      These Terms are governed by the laws of India, without regard to conflict-of-law
+      principles.
+    </p>
+  </div>
+
+  <div class="reveal">
+    <h2>10. Contact</h2>
+    <p>Questions about these Terms: <a href="mailto:rajath@rasova.net">rajath@rasova.net</a></p>
+  </div>
 
 </div>
+
+<footer>
+  &copy; {% now "Y" %} Silvora Cloud - End-to-End Encrypted Cloud Storage Made in India.<br>
+  <small style="opacity:0.7;">Your Cloud. Your Control. Your Country.</small><br>
+  <small><a href="/privacy/">Privacy Policy</a> &middot; <a href="/terms/">Terms of Service</a></small>
+</footer>
+
+<script>
+(function navScroll() {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+(function scrollReveal() {
+  const targets = document.querySelectorAll('.reveal');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion || !('IntersectionObserver' in window)) {
+    targets.forEach(t => t.classList.add('in-view'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  targets.forEach(t => io.observe(t));
+})();
+</script>
+
 </body>
 </html>

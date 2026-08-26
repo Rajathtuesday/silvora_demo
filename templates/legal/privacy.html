@@ -7,6 +7,9 @@
 <title>Privacy Policy - Silvora</title>
 <link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
 <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #080910;
@@ -19,46 +22,77 @@
     --text-secondary: #8A8FAA;
     --text-muted: #4A4F6A;
     --border: #232639;
+    --font-display: "Syne", sans-serif;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: "DM Sans", sans-serif;
     line-height: 1.65;
   }
+  h1, h2, h3 { font-family: var(--font-display); }
+
+  /* Nav -- same structure/behavior as the landing page */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    padding: 28px 6vw;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid transparent;
+    transition: background .3s ease, border-color .3s ease;
+  }
+  .nav.scrolled {
+    background: rgba(8,9,16,0.82);
+    backdrop-filter: blur(14px);
+    border-bottom-color: var(--border);
+  }
+  .logo {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    text-decoration: none;
+    color: var(--text);
+  }
+  .dot { color: var(--primary); }
+  .nav-links { display: flex; gap: 24px; align-items: center; }
+  .nav-links a {
+    color: var(--text);
+    opacity: .8;
+    text-decoration: none;
+    transition: .25s;
+    font-size: 0.95rem;
+  }
+  .nav-links a:hover { opacity: 1; }
+  .nav-download {
+    padding: 10px 22px;
+    border-radius: 10px;
+    background: var(--primary);
+    font-weight: 600 !important;
+    font-size: 0.9rem !important;
+    opacity: 1 !important;
+  }
+  .nav-download:hover { opacity: .85 !important; }
+
   .wrap {
     max-width: 760px;
     margin: 0 auto;
     padding: 48px 24px 96px;
   }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
-  }
-  .brand-logo {
-    width: 22px; height: 22px;
-    border-radius: 6px;
-    display: block;
-  }
-  .brand-name {
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    color: var(--text);
-    font-size: 14px;
-    text-transform: uppercase;
-  }
   h1 {
-    font-size: 28px;
+    font-size: 32px;
+    font-weight: 700;
     margin: 18px 0 4px;
   }
   .updated {
     color: var(--text-muted);
     font-size: 13px;
     margin-bottom: 32px;
+    font-family: "DM Sans", sans-serif;
   }
   .card {
     background: var(--card);
@@ -73,7 +107,8 @@
   }
   .card.beta strong { color: var(--gold); }
   h2 {
-    font-size: 18px;
+    font-size: 20px;
+    font-weight: 700;
     color: var(--text);
     margin: 36px 0 10px;
     padding-bottom: 8px;
@@ -81,6 +116,7 @@
   }
   h3 {
     font-size: 15px;
+    font-weight: 600;
     color: var(--primary-light);
     margin: 20px 0 6px;
   }
@@ -109,200 +145,274 @@
     font-size: 13px;
     color: var(--gold);
   }
+
+  /* Footer -- same structure/copy pattern as the landing page */
   footer {
+    text-align: center;
+    padding: 35px;
+    opacity: .5;
+    font-size: .9rem;
     margin-top: 48px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 13px;
+  }
+  footer a { color: inherit; text-decoration: underline; }
+
+  /* Scroll reveal -- same mechanism as the landing page, generic for
+     document content instead of card grids */
+  .reveal {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity .6s ease, transform .6s ease;
+  }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+  @media (max-width: 768px) {
+    .nav { padding: 20px 6vw; }
+    .nav-links { gap: 14px; }
+    .nav-links a:not(.nav-download) { display: none; }
   }
 </style>
 </head>
 <body>
+
+<header class="nav">
+  <a href="/" class="logo">Silvora<span class="dot">.</span></a>
+  <div class="nav-links">
+    <a href="/">Home</a>
+    <a href="/#about">About</a>
+    <a href="/#features">Features</a>
+    <a href="/#pricing">Pricing</a>
+    <a class="nav-download" href="{% static 'downloads/silvora.apk' %}">Download for Android</a>
+  </div>
+</header>
+
 <div class="wrap">
 
-  <div class="brand">
-    <img src="{% static 'favicon/apple-touch-icon.png' %}" alt="Silvora" class="brand-logo">
-    <span class="brand-name">Silvora</span>
-  </div>
   <h1>Privacy Policy</h1>
   <div class="updated">Last updated: 6 August 2026</div>
 
-  <div class="card beta">
+  <div class="card beta reveal">
     <strong>Beta software.</strong> Silvora is currently in a closed/limited beta.
     Features, infrastructure, and this policy may change as the product develops.
     If anything here changes in a way that affects your data, we'll update this page
     and, where practical, notify testers directly.
   </div>
 
-  <p>
+  <p class="reveal">
     Silvora is a zero-knowledge, end-to-end encrypted (E2EE) file storage app.
     This page explains, as plainly as possible, what information Silvora collects,
     what is encrypted before it ever reaches our servers, and what - by design -
     we are technically unable to see.
   </p>
 
-  <h2>The short version</h2>
-  <p>
-    <span class="tag cant">We can't see</span> your files, your filenames, or the
-    encryption key that protects them. They are encrypted on your device before
-    upload, and only your device - using your password or 24-word recovery phrase -
-    can decrypt them.
-  </p>
-  <p>
-    <span class="tag can">We can see</span> your account email, the size of each
-    file (in bytes), and timestamps (when a file was uploaded, modified, or deleted).
-    This is unavoidable metadata needed to operate storage, quotas, and the file
-    list - but it never reveals what's inside a file or what it's called.
-  </p>
+  <div class="reveal">
+    <h2>The short version</h2>
+    <p>
+      <span class="tag cant">We can't see</span> your files, your filenames, or the
+      encryption key that protects them. They are encrypted on your device before
+      upload, and only your device - using your password or 24-word recovery phrase -
+      can decrypt them.
+    </p>
+    <p>
+      <span class="tag can">We can see</span> your account email, the size of each
+      file (in bytes), and timestamps (when a file was uploaded, modified, or deleted).
+      This is unavoidable metadata needed to operate storage, quotas, and the file
+      list - but it never reveals what's inside a file or what it's called.
+    </p>
+  </div>
 
-  <h2>Information we collect</h2>
+  <div class="reveal">
+    <h2>Information we collect</h2>
 
-  <h3>Account information</h3>
-  <ul>
-    <li><strong>Email address</strong> - used as your account identifier (login)
-      and, if you choose, for account-related communication (e.g. security notices).</li>
-    <li><strong>Password</strong> - stored only as a one-way hash using Django's
-      standard password hashing. We never store, log, or have access to your
-      plaintext password.</li>
-  </ul>
+    <h3>Account information</h3>
+    <ul>
+      <li><strong>Email address</strong> - used as your account identifier (login)
+        and, if you choose, for account-related communication (e.g. security notices).</li>
+      <li><strong>Password</strong> - stored only as a one-way hash using Django's
+        standard password hashing. We never store, log, or have access to your
+        plaintext password.</li>
+    </ul>
 
-  <h3>Encryption keys and recovery</h3>
-  <ul>
-    <li><strong>Encrypted master key envelope</strong> - your master encryption key
-      itself never leaves your device in usable form. We only store an encrypted
-      "envelope" (ciphertext + nonce) that can only be opened on your device using
-      a key derived from your password (via Argon2id).</li>
-    <li><strong>Recovery envelope</strong> - a second encrypted copy of the same
-      master key, openable only with your 24-word recovery phrase. We store this
-      envelope, but never the phrase itself.</li>
-    <li><strong>Recovery phrase verification hash</strong> - to confirm you've
-      entered the correct recovery phrase, we store a one-way hash derived from it
-      (via HKDF, then a standard password hash). This lets the server verify
-      "yes, that's the right phrase" without ever learning or storing the phrase.</li>
-  </ul>
+    <h3>Encryption keys and recovery</h3>
+    <ul>
+      <li><strong>Encrypted master key envelope</strong> - your master encryption key
+        itself never leaves your device in usable form. We only store an encrypted
+        "envelope" (ciphertext + nonce) that can only be opened on your device using
+        a key derived from your password (via Argon2id).</li>
+      <li><strong>Recovery envelope</strong> - a second encrypted copy of the same
+        master key, openable only with your 24-word recovery phrase. We store this
+        envelope, but never the phrase itself.</li>
+      <li><strong>Recovery phrase verification hash</strong> - to confirm you've
+        entered the correct recovery phrase, we store a one-way hash derived from it
+        (via HKDF, then a standard password hash). This lets the server verify
+        "yes, that's the right phrase" without ever learning or storing the phrase.</li>
+    </ul>
 
-  <h3>Your files</h3>
-  <ul>
-    <li><strong>File contents</strong> - encrypted on your device (XChaCha20-Poly1305)
-      before upload. The server stores only ciphertext and cannot decrypt it.</li>
-    <li><strong>Filenames</strong> - also encrypted on your device before upload
-      (ciphertext, nonce, and integrity tag). The server cannot read your filenames.</li>
-    <li><strong>File size, in bytes</strong> - visible to the server, since it's
-      needed to allocate storage and enforce your quota. File size does not reveal
-      file contents.</li>
-    <li><strong>Timestamps</strong> - when a file was created, modified, or deleted,
-      used for the file list, sync, and cleanup of deleted items.</li>
-    <li><strong>Internal storage identifiers</strong> - opaque IDs and storage paths
-      used internally to locate the encrypted blob in storage. These do not contain
-      or reveal your filename or content.</li>
-  </ul>
+    <h3>Your files</h3>
+    <ul>
+      <li><strong>File contents</strong> - encrypted on your device (XChaCha20-Poly1305)
+        before upload. The server stores only ciphertext and cannot decrypt it.</li>
+      <li><strong>Filenames</strong> - also encrypted on your device before upload
+        (ciphertext, nonce, and integrity tag). The server cannot read your filenames.</li>
+      <li><strong>File size, in bytes</strong> - visible to the server, since it's
+        needed to allocate storage and enforce your quota. File size does not reveal
+        file contents.</li>
+      <li><strong>Timestamps</strong> - when a file was created, modified, or deleted,
+        used for the file list, sync, and cleanup of deleted items.</li>
+      <li><strong>Internal storage identifiers</strong> - opaque IDs and storage paths
+        used internally to locate the encrypted blob in storage. These do not contain
+        or reveal your filename or content.</li>
+    </ul>
 
-  <h3>Storage usage</h3>
-  <ul>
-    <li>We track how many bytes your account has used against your plan's quota
-      (Free / Pro / Enterprise tiers). This is a running total, derived from the
-      file sizes above.</li>
-  </ul>
+    <h3>Storage usage</h3>
+    <ul>
+      <li>We track how many bytes your account has used against your plan's quota
+        (Free / Pro / Enterprise tiers). This is a running total, derived from the
+        file sizes above.</li>
+    </ul>
 
-  <h3>Standard infrastructure logs</h3>
-  <ul>
-    <li>Like virtually all web services, our hosting and network providers
-      (see "Infrastructure" below) generate routine connection logs (IP address,
-      timestamp, request path) for security, abuse prevention, and debugging.
-      These are operational logs, not something Silvora's application code
-      reads or stores long-term.</li>
-  </ul>
+    <h3>Standard infrastructure logs</h3>
+    <ul>
+      <li>Like virtually all web services, our hosting and network providers
+        (see "Infrastructure" below) generate routine connection logs (IP address,
+        timestamp, request path) for security, abuse prevention, and debugging.
+        These are operational logs, not something Silvora's application code
+        reads or stores long-term.</li>
+    </ul>
+  </div>
 
-  <h2>What we cannot do</h2>
-  <ul>
-    <li>We cannot read the contents of your files.</li>
-    <li>We cannot read your filenames.</li>
-    <li>We cannot recover your account if you lose <em>both</em> your password
-      and your 24-word recovery phrase - there is no "reset" path that bypasses
-      encryption, because we never have access to the key.</li>
-    <li>We cannot view, sell, or share data we don't have. We have nothing to
-      hand over for your files even if compelled to - only encrypted bytes.</li>
-  </ul>
+  <div class="reveal">
+    <h2>What we cannot do</h2>
+    <ul>
+      <li>We cannot read the contents of your files.</li>
+      <li>We cannot read your filenames.</li>
+      <li>We cannot recover your account if you lose <em>both</em> your password
+        and your 24-word recovery phrase - there is no "reset" path that bypasses
+        encryption, because we never have access to the key.</li>
+      <li>We cannot view, sell, or share data we don't have. We have nothing to
+        hand over for your files even if compelled to - only encrypted bytes.</li>
+    </ul>
+  </div>
 
-  <h2>Infrastructure &amp; third parties</h2>
-  <p>Silvora runs on a small set of infrastructure providers, each of which only
-    ever sees encrypted data where applicable:</p>
-  <ul>
-    <li><strong>Render</strong> - hosts the backend application server.</li>
-    <li><strong>Neon (PostgreSQL)</strong> - hosts the database (account records,
-      encrypted key envelopes, file metadata).</li>
-    <li><strong>Cloudflare R2</strong> - stores encrypted file blobs.</li>
-    <li><strong>Razorpay</strong> - processes subscription payments if you
-      upgrade to a paid plan. Razorpay sees your payment details directly;
-      Silvora never receives or stores your card/UPI information.</li>
-    <li><strong>Gmail (Google)</strong> - sends account emails (e.g. email
-      verification). Your email address passes through Google's servers
-      to deliver these.</li>
-  </ul>
-  <p>We do not sell your data, and we do not share it with advertisers. We do not
-    run analytics or tracking SDKs inside the app.</p>
+  <div class="reveal">
+    <h2>Infrastructure &amp; third parties</h2>
+    <p>Silvora runs on a small set of infrastructure providers, each of which only
+      ever sees encrypted data where applicable:</p>
+    <ul>
+      <li><strong>Render</strong> - hosts the backend application server.</li>
+      <li><strong>Neon (PostgreSQL)</strong> - hosts the database (account records,
+        encrypted key envelopes, file metadata).</li>
+      <li><strong>Cloudflare R2</strong> - stores encrypted file blobs.</li>
+      <li><strong>Razorpay</strong> - processes subscription payments if you
+        upgrade to a paid plan. Razorpay sees your payment details directly;
+        Silvora never receives or stores your card/UPI information.</li>
+      <li><strong>Gmail (Google)</strong> - sends account emails (e.g. email
+        verification). Your email address passes through Google's servers
+        to deliver these.</li>
+    </ul>
+    <p>We do not sell your data, and we do not share it with advertisers. We do not
+      run analytics or tracking SDKs inside the app.</p>
+  </div>
 
-  <h2>Your rights over your data</h2>
-  <p>Regardless of where you live, you have the following rights over your
-    account data. EU/UK residents have these rights under GDPR; we extend the
-    same rights to everyone, not just where legally required:</p>
-  <ul>
-    <li><strong>Right to access</strong> - use <strong>Settings → Export My
-      Data</strong> in the app to download everything tied to your account:
-      every file (decrypted locally, on your device, the same way normal
-      downloads work) plus your account profile and usage info as a single
-      file.</li>
-    <li><strong>Right to erasure</strong> - <strong>Settings → Delete
-      Account</strong> permanently and immediately removes your files,
-      encryption key envelopes, and account record. See "Data retention &amp;
-      deletion" below.</li>
-    <li><strong>Right to rectification</strong> - applies to account-level
-      info like your email address, not file contents - we have no way to
-      "correct" data we cannot read in the first place.</li>
-    <li><strong>Right to portability</strong> - the same export above gives
-      you your data in a form you can move elsewhere; nothing is locked into
-      a proprietary format beyond standard encryption you hold the key to.</li>
-    <li><strong>Right to object / restrict processing</strong> - contact us
-      (below) and we'll act on this manually; Silvora's automated processing
-      is limited to storage, quota enforcement, and billing.</li>
-  </ul>
-  <p>To exercise any of these, use the in-app controls above or email us at
-    the address in "Contact" below.</p>
+  <div class="reveal">
+    <h2>Your rights over your data</h2>
+    <p>Regardless of where you live, you have the following rights over your
+      account data. EU/UK residents have these rights under GDPR; we extend the
+      same rights to everyone, not just where legally required:</p>
+    <ul>
+      <li><strong>Right to access</strong> - use <strong>Settings → Export My
+        Data</strong> in the app to download everything tied to your account:
+        every file (decrypted locally, on your device, the same way normal
+        downloads work) plus your account profile and usage info as a single
+        file.</li>
+      <li><strong>Right to erasure</strong> - <strong>Settings → Delete
+        Account</strong> permanently and immediately removes your files,
+        encryption key envelopes, and account record. See "Data retention &amp;
+        deletion" below.</li>
+      <li><strong>Right to rectification</strong> - applies to account-level
+        info like your email address, not file contents - we have no way to
+        "correct" data we cannot read in the first place.</li>
+      <li><strong>Right to portability</strong> - the same export above gives
+        you your data in a form you can move elsewhere; nothing is locked into
+        a proprietary format beyond standard encryption you hold the key to.</li>
+      <li><strong>Right to object / restrict processing</strong> - contact us
+        (below) and we'll act on this manually; Silvora's automated processing
+        is limited to storage, quota enforcement, and billing.</li>
+    </ul>
+    <p>To exercise any of these, use the in-app controls above or email us at
+      the address in "Contact" below.</p>
+  </div>
 
-  <h2>Data retention &amp; deletion</h2>
-  <ul>
-    <li>When you delete a file, it moves to Trash and is removed from your
-      visible file list immediately. It stays recoverable in Trash for
-      <strong>7 days</strong>, then the underlying encrypted blob is
-      automatically and permanently purged from storage. You can also
-      permanently erase a file from Trash yourself at any time, before the
-      7 days are up, if you don't want to wait.</li>
-    <li>You can permanently delete your account and all associated data at any
-      time from <strong>Settings → Delete Account</strong> in the app. This
-      removes your encrypted files from storage, your encryption key envelopes,
-      and your account record immediately and cannot be undone. You can also
-      contact us at the email below if you'd prefer we do this for you.</li>
-  </ul>
+  <div class="reveal">
+    <h2>Data retention &amp; deletion</h2>
+    <ul>
+      <li>When you delete a file, it moves to Trash and is removed from your
+        visible file list immediately. It stays recoverable in Trash for
+        <strong>7 days</strong>, then the underlying encrypted blob is
+        automatically and permanently purged from storage. You can also
+        permanently erase a file from Trash yourself at any time, before the
+        7 days are up, if you don't want to wait.</li>
+      <li>You can permanently delete your account and all associated data at any
+        time from <strong>Settings → Delete Account</strong> in the app. This
+        removes your encrypted files from storage, your encryption key envelopes,
+        and your account record immediately and cannot be undone. You can also
+        contact us at the email below if you'd prefer we do this for you.</li>
+    </ul>
+  </div>
 
-  <h2>Children's privacy</h2>
-  <p>Silvora is not directed at children, and we do not knowingly collect
-    information from anyone under 13 (or under 16 where local law, including
-    GDPR, sets a higher age for consent without a parent or guardian).</p>
+  <div class="reveal">
+    <h2>Children's privacy</h2>
+    <p>Silvora is not directed at children, and we do not knowingly collect
+      information from anyone under 13 (or under 16 where local law, including
+      GDPR, sets a higher age for consent without a parent or guardian).</p>
+  </div>
 
-  <h2>Changes to this policy</h2>
-  <p>We may update this policy as Silvora moves from beta toward general
-    availability. Material changes will be reflected on this page with an updated
-    "Last updated" date.</p>
+  <div class="reveal">
+    <h2>Changes to this policy</h2>
+    <p>We may update this policy as Silvora moves from beta toward general
+      availability. Material changes will be reflected on this page with an updated
+      "Last updated" date.</p>
+  </div>
 
-  <h2>Contact</h2>
-  <p>Questions about this policy or your data: <a href="mailto:privacy@rasova.net">privacy@rasova.net</a></p>
-
-  <footer>
-    Silvora - zero-knowledge encrypted storage. See also our
-    <a href="/terms/">Terms of Service</a>.
-  </footer>
+  <div class="reveal">
+    <h2>Contact</h2>
+    <p>Questions about this policy or your data: <a href="mailto:privacy@rasova.net">privacy@rasova.net</a></p>
+  </div>
 
 </div>
+
+<footer>
+  &copy; {% now "Y" %} Silvora Cloud - End-to-End Encrypted Cloud Storage Made in India.<br>
+  <small style="opacity:0.7;">Your Cloud. Your Control. Your Country.</small><br>
+  <small><a href="/privacy/">Privacy Policy</a> &middot; <a href="/terms/">Terms of Service</a></small>
+</footer>
+
+<script>
+(function navScroll() {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+
+(function scrollReveal() {
+  const targets = document.querySelectorAll('.reveal');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion || !('IntersectionObserver' in window)) {
+    targets.forEach(t => t.classList.add('in-view'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  targets.forEach(t => io.observe(t));
+})();
+</script>
+
 </body>
 </html>
