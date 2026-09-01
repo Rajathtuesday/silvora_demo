@@ -84,8 +84,24 @@ AUTH_USER_MODEL = "users.User"
 
 # =====================================================
 # 🔑 PASSWORD STRENGTH (critical for a Zero-Knowledge vault)
-# The password derives the KEK that protects the master key, so a weak
-# password = a weak vault no matter how strong the cipher is.
+#
+# As of the 2026-08-31 fix: this field NEVER receives the user's actual
+# password. It receives login_auth_key = HKDF(KEK, "silvora-login-auth"),
+# a one-way value the client derives locally, the same pattern already used
+# for the recovery phrase (see MasterKeyEnvelope.recovery_auth_hash). The
+# real password still derives the KEK that protects the master key -- that
+# derivation just never leaves the device, and the server no longer sees or
+# stores anything that could reproduce it.
+#
+# CommonPasswordValidator/NumericPasswordValidator/UserAttributeSimilarity-
+# Validator are now effectively inert -- they're written for a human-chosen
+# password, and this field holds a high-entropy derived key that will never
+# match a common-password list, never be all-numeric, and never resemble a
+# username/email. Left in place because they don't reject anything valid,
+# not because they're doing meaningful work here. The REAL password-strength
+# gate is client-side (register_screen.dart: min 12 chars) on the actual raw
+# password, before it's ever run through Argon2 -- that requirement didn't
+# move, only what the server sees afterward did.
 # =====================================================
 
 AUTH_PASSWORD_VALIDATORS = [

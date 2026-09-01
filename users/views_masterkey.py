@@ -11,6 +11,7 @@ from .models import MasterKeyEnvelope
 from .serializers import (
     MasterKeyMetaSerializer,
     MasterKeySetupSerializer,
+    LoginKdfParamsSerializer,
     RecoveryMetaSerializer,
     RecoverSerializer,
     ChangePasswordSerializer,
@@ -75,6 +76,29 @@ class ChangePasswordView(APIView):
             _apply_new_password_envelope(env, data)
             env.save()
         return Response({"status": "password_changed"})
+
+
+class LoginKdfParamsView(APIView):
+    """Logged-out: given an email, return the KDF parameters (never the
+    encrypted master key) so the client can derive the KEK -- and from it,
+    the login-auth-key it actually authenticates with -- locally, before
+    ever contacting the token endpoint. Breaks what would otherwise be a
+    chicken-and-egg problem: the client can't compute the login-auth-key
+    without the salt, and the salt used to live only behind an
+    IsAuthenticated endpoint. Same account-enumeration tradeoff
+    RecoveryStartView below already makes (a 404 here reveals whether an
+    email is registered) -- not a new exposure, the existing one extended
+    to a second endpoint.
+    """
+    permission_classes = [AllowAny]
+    throttle_scope = "login"
+
+    def post(self, request):
+        email = (request.data.get("email") or request.data.get("username") or "").strip().lower()
+        env = MasterKeyEnvelope.objects.filter(user__email=email).first()
+        if not env:
+            return Response({"error": "No account found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(LoginKdfParamsSerializer(env).data)
 
 
 class RecoveryStartView(APIView):

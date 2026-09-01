@@ -295,6 +295,212 @@ class RecoveryFlowTests(APITestCase):
         self.assertEqual(res.status_code, 201, res.content)
 
 
+class LoginKdfParamsTests(APITestCase):
+    """2026-08-31 fix: the client must be able to fetch KDF params BEFORE
+    authenticating, to derive the KEK -- and from it, the login_auth_key it
+    actually authenticates with -- locally. See LoginKdfParamsView."""
+
+    REGISTER = "/api/auth/register/"
+    SETUP = "/api/auth/master-key/setup/"
+    TOKEN = "/api/auth/token/"
+    KDF_PARAMS = "/api/auth/login-kdf-params/"
+    PW = "Str0ng!Vault#Key2026"
+
+    ENV = {
+        "enc_master_key": "ab" * 48,
+        "enc_master_key_nonce": "cd" * 24,
+        "kdf_salt": "ef" * 16,
+        "kdf_memory_kb": 65536, "kdf_iterations": 3, "kdf_parallelism": 1,
+    }
+
+    def setUp(self):
+        cache.clear()
+        self.email = "kdfparams@example.com"
+        self.client.post(self.REGISTER, {"email": self.email, "password": self.PW, "accepted_privacy_policy": True}, format="json")
+        cache.clear()
+        res = self.client.post(self.TOKEN, {"username": self.email, "password": self.PW}, format="json")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.json()['access']}")
+        self.client.post(self.SETUP, self.ENV, format="json")
+        self.client.credentials()  # log out -- this endpoint must work unauthenticated
+
+    def test_returns_kdf_params_for_existing_account(self):
+        cache.clear()
+        res = self.client.post(self.KDF_PARAMS, {"username": self.email}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        body = res.json()
+        self.assertEqual(body["kdf_salt_hex"], self.ENV["kdf_salt"])
+        self.assertEqual(body["kdf_memory_kb"], self.ENV["kdf_memory_kb"])
+        self.assertEqual(body["kdf_iterations"], self.ENV["kdf_iterations"])
+        self.assertEqual(body["kdf_parallelism"], self.ENV["kdf_parallelism"])
+
+    def test_never_returns_the_encrypted_master_key(self):
+        """The whole point: KDF params alone reveal nothing about the vault."""
+        cache.clear()
+        res = self.client.post(self.KDF_PARAMS, {"username": self.email}, format="json")
+        body = res.json()
+        self.assertNotIn("encrypted_master_key_hex", body)
+        self.assertNotIn("enc_master_key", body)
+        self.assertNotIn("nonce_hex", body)
+
+    def test_unknown_email_returns_404_not_500(self):
+        cache.clear()
+        res = self.client.post(self.KDF_PARAMS, {"username": "nobody@example.com"}, format="json")
+        self.assertEqual(res.status_code, 404)
+
+    def test_accepts_email_field_name_too(self):
+        """The client sends 'username' (matching the token endpoint's field
+        name), but 'email' is accepted too so this isn't fragile to which
+        key a caller happens to use."""
+        cache.clear()
+        res = self.client.post(self.KDF_PARAMS, {"email": self.email}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+
+    def test_works_while_logged_out(self):
+        """Not authenticated at all in this test (setUp already logged out) --
+        this is the entire reason the endpoint exists."""
+        cache.clear()
+        res = self.client.post(self.KDF_PARAMS, {"username": self.email}, format="json")
+        self.assertEqual(res.status_code, 200)
+
+
+class LoginAuthKeySeparationTests(APITestCase):
+    """The headline guarantee of the 2026-08-31 fix: whatever string the
+    client sends as 'password' is opaque to the backend -- it's checked
+    exactly like a real password, with no way to distinguish a raw password
+    from a derived login_auth_key. That opacity is what makes the whole
+    client-side fix possible without any backend auth-mechanism change."""
+
+    REGISTER = "/api/auth/register/"
+    TOKEN = "/api/auth/token/"
+
+    def setUp(self):
+        cache.clear()
+
+    def test_a_high_entropy_derived_value_works_exactly_like_a_password(self):
+        # Simulates what the client now actually sends: not a human-chosen
+        # password, but a 32-byte HKDF output, hex-encoded (64 hex chars).
+        derived_value = "3f9a7b2c" * 8
+        email = "derived@example.com"
+
+        res = self.client.post(
+            self.REGISTER,
+            {"email": email, "password": derived_value, "accepted_privacy_policy": True},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 201, res.content)
+
+        cache.clear()
+        res = self.client.post(self.TOKEN, {"username": email, "password": derived_value}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+
+    def test_the_stored_hash_is_of_whatever_was_sent_not_a_real_password(self):
+        derived_value = "a1b2c3d4" * 8
+        email = "derived2@example.com"
+        self.client.post(
+            self.REGISTER,
+            {"email": email, "password": derived_value, "accepted_privacy_policy": True},
+            format="json",
+        )
+        user = User.objects.get(email=email)
+        self.assertTrue(user.check_password(derived_value))
+        self.assertFalse(user.check_password("some totally different string"))
+
+
+class CutoverManagementCommandTests(APITestCase):
+    """cutover_login_auth_key: the clean-cutover migration for existing
+    accounts once the login/KEK-separation fix ships. Recovery-enabled
+    accounts must be identified correctly, since that's what determines
+    whether an account has a self-service way back in afterward."""
+
+    REGISTER = "/api/auth/register/"
+    SETUP = "/api/auth/master-key/setup/"
+    TOKEN = "/api/auth/token/"
+    PW = "Str0ng!Vault#Key2026"
+
+    ENV = {
+        "enc_master_key": "ab" * 48, "enc_master_key_nonce": "cd" * 24,
+        "kdf_salt": "ef" * 16, "kdf_memory_kb": 65536, "kdf_iterations": 3, "kdf_parallelism": 1,
+    }
+    REC = {
+        "enc_master_key_recovery": "11" * 48, "enc_master_key_recovery_nonce": "22" * 24,
+        "recovery_kdf_salt": "33" * 16, "recovery_kdf_memory_kb": 65536,
+        "recovery_kdf_iterations": 3, "recovery_kdf_parallelism": 1,
+        "recovery_auth_key": "some-recovery-auth-key",
+    }
+
+    def setUp(self):
+        cache.clear()
+
+    def _register_with_envelope(self, email, extra=None):
+        self.client.post(self.REGISTER, {"email": email, "password": self.PW, "accepted_privacy_policy": True}, format="json")
+        cache.clear()
+        res = self.client.post(self.TOKEN, {"username": email, "password": self.PW}, format="json")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.json()['access']}")
+        self.client.post(self.SETUP, {**self.ENV, **(extra or {})}, format="json")
+        self.client.credentials()
+        cache.clear()
+
+    def test_dry_run_makes_no_changes(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        self._register_with_envelope("dryrun@example.com")
+        user = User.objects.get(email="dryrun@example.com")
+        old_hash = user.password
+
+        call_command("cutover_login_auth_key", "--dry-run", stdout=StringIO())
+
+        user.refresh_from_db()
+        self.assertEqual(user.password, old_hash)
+        self.assertTrue(user.has_usable_password())
+        # And the old password still logs in -- dry-run touched nothing.
+        res = self.client.post(self.TOKEN, {"username": "dryrun@example.com", "password": self.PW}, format="json")
+        self.assertEqual(res.status_code, 200)
+
+    def test_real_run_invalidates_old_password(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        self._register_with_envelope("realrun@example.com")
+        call_command("cutover_login_auth_key", stdout=StringIO())
+
+        user = User.objects.get(email="realrun@example.com")
+        self.assertFalse(user.has_usable_password())
+
+        res = self.client.post(self.TOKEN, {"username": "realrun@example.com", "password": self.PW}, format="json")
+        self.assertEqual(res.status_code, 401)
+
+    def test_account_with_recovery_can_self_serve_a_new_password_after_cutover(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        self._register_with_envelope("hasrecovery@example.com", extra=self.REC)
+        call_command("cutover_login_auth_key", stdout=StringIO())
+
+        new_pw = "N3w!Str0ng#Vault2027"
+        res = self.client.post("/api/auth/recover/", {
+            "email": "hasrecovery@example.com",
+            "recovery_auth_key": self.REC["recovery_auth_key"],
+            "new_password": new_pw,
+            **self.ENV,
+        }, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+
+        cache.clear()
+        res = self.client.post(self.TOKEN, {"username": "hasrecovery@example.com", "password": new_pw}, format="json")
+        self.assertEqual(res.status_code, 200)
+
+    def test_command_reports_accounts_without_recovery_separately(self):
+        from io import StringIO
+        from django.core.management import call_command
+
+        self._register_with_envelope("norecovery@example.com")  # no REC extras
+        out = StringIO()
+        call_command("cutover_login_auth_key", "--dry-run", stdout=out)
+        self.assertIn("norecovery@example.com", out.getvalue())
+        self.assertIn("do NOT", out.getvalue())
+
+
 class EmailVerificationTests(APITestCase):
     """Verification is non-blocking by design: recovery already works without
     email, so an unverified account must still log in and use the vault

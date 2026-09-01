@@ -95,6 +95,23 @@ class MasterKeyMetaSerializer(serializers.ModelSerializer):
     def get_kdf_salt_hex(self, obj): return obj.kdf_salt.hex()
 
 
+# ======================= LOGIN KDF PARAMS =========================
+class LoginKdfParamsSerializer(serializers.ModelSerializer):
+    """Returned pre-authentication (by email) so the client can derive the
+    KEK -- and from it, the login-auth-key it actually authenticates with --
+    locally, without ever needing to send the raw password anywhere.
+    Deliberately excludes enc_master_key: knowing the KDF parameters alone
+    reveals nothing about the vault, the same reasoning RecoveryMetaSerializer
+    already applies to the recovery envelope."""
+    kdf_salt_hex = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MasterKeyEnvelope
+        fields = ("kdf_salt_hex", "kdf_memory_kb", "kdf_iterations", "kdf_parallelism")
+
+    def get_kdf_salt_hex(self, obj): return obj.kdf_salt.hex()
+
+
 # ====================== RECOVERY ENVELOPE META ===================
 class RecoveryMetaSerializer(serializers.ModelSerializer):
     """Returned (by email) so the client can derive the Recovery-KEK and

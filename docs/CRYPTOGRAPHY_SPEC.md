@@ -17,9 +17,19 @@ There are two independent paths to the same master key, not one.
 User Password
     -> Argon2id (client-side)
     -> Password KEK
-    -> decrypts enc_master_key
-    -> Master Key
+    -> decrypts enc_master_key           -> Master Key
+    -> HKDF-SHA256(KEK, info="silvora-login-auth") -> login_auth_key (sent to the server)
 ```
+As of 2026-08-31, the KEK branches two ways, not one. It still unwraps the
+master key exactly as before, but it also derives a second, independent
+value — `login_auth_key` — and that is what actually reaches the server on
+register/login/change-password/recover/delete-account, never the password
+itself. See **Login Authentication** below; this replaces an earlier design
+where the raw password was sent directly to the login endpoint, which meant
+a captured login request (a rogue admin, a compromised server, or a stray
+debug log of the request body) gave the server everything needed to
+re-derive the KEK and decrypt the vault. Details and full history in
+`docs/THREAT_MODEL.md`'s Rogue Admin section.
 
 **Recovery path, entirely independent of the password:**
 ```
@@ -49,6 +59,16 @@ Each derivation uses its own domain-separation label. A key leaked for one purpo
 - Generated client-side, 256-bit random value
 - Never transmitted to the server in plaintext, only as two independently-wrapped envelopes (see above)
 - Held in memory only on the client while unlocked; not cached to disk
+
+---
+
+## Login Authentication
+
+The server needs to verify a user typed the correct password back, without that verification depending on ever seeing (or being able to reproduce) the value that unwraps the vault. This is done with a value the client derives via `HKDF(passwordKek, info="silvora-login-auth")`, sent as the `password` field to `/api/auth/register/`, `/api/auth/token/`, `/api/auth/master-key/change-password/`, `/api/auth/recover/`, and `/api/auth/account/delete/`. Django's own auth machinery stores and checks this exactly as it would a real password (`User.password`, standard PBKDF2 hash) — it is opaque to Django which string it's hashing, so no change to that machinery was needed, only to what the client sends it.
+
+Since login now needs the account's Argon2id salt/parameters *before* authenticating (to derive the KEK that `login_auth_key` comes from), `POST /api/auth/login-kdf-params/` returns just those parameters, publicly, given an email — never `enc_master_key`. Knowing the KDF parameters alone reveals nothing about the vault; the same reasoning already applied to `/api/auth/recover/start/` below, extended to a second endpoint. Registration doesn't need this endpoint, since the client generates its own fresh salt there.
+
+The server can confirm a `login_auth_key` match; it cannot work backward from a captured value (in transit, in a log, or from a compromised server) to the KEK or the password, for the same HKDF one-wayness reason the recovery-auth-key below already relies on. This is a direct application of that existing pattern to the primary password path, not a new mechanism — see `docs/THREAT_MODEL.md`'s Rogue Admin section for the vulnerability this closed.
 
 ---
 
