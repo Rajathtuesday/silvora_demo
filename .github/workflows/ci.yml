@@ -23,6 +23,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Collect static files
+        # render.yaml's buildCommand does this before every real deploy.
+        # Without it here, CI never has WhiteNoise's manifest that STATICFILES_STORAGE
+        # (CompressedManifestStaticFilesStorage) needs to resolve {% static %} tags --
+        # any test that renders a real HTML page (e.g. Django admin's login form)
+        # fails with "Missing staticfiles manifest entry" on a fresh checkout, even
+        # though the same test can pass locally if collectstatic happened to run
+        # there before, on a totally different day, for a totally different reason.
+        run: python manage.py collectstatic --noinput
+
       - name: Django system check
         run: python manage.py check
 
