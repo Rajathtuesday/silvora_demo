@@ -1,4 +1,5 @@
 import uuid
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth import get_user_model
@@ -101,6 +102,61 @@ class UploadReliabilityTests(APITestCase):
             format="multipart",
         )
         self.assertEqual(res.status_code, 400)
+
+    @patch("files.services.upload_service.StorageGateway")
+    def test_oversized_single_chunk_rejected(self, mock_storage_cls):
+        # Was: no per-chunk cap anywhere -- an arbitrarily large single POST
+        # body would be written straight to storage.
+        from files.services.upload_service import MAX_CHUNK_BYTES
+
+        file = self._file()
+        file.size = MAX_CHUNK_BYTES * 10  # declared size is not the problem here
+        file.save(update_fields=["size"])
+        storage = mock_storage_cls.return_value
+        storage.calculate_total_chunk_size.return_value = 0
+
+        oversized = SimpleUploadedFile(
+            "chunk_0.bin", b"x" * (MAX_CHUNK_BYTES + 1), content_type="application/octet-stream",
+        )
+        res = self.client.post(f"/file/{file.id}/chunk/0/", {"chunk": oversized}, format="multipart")
+
+        self.assertEqual(res.status_code, 413)
+        storage.upload_bytes.assert_not_called()
+
+    @patch("files.services.upload_service.StorageGateway")
+    def test_cumulative_bytes_exceeding_declared_size_rejected(self, mock_storage_cls):
+        # Was: a client could declare a tiny size at start() then upload
+        # unlimited real chunk bytes -- nothing checked again until commit(),
+        # by which point the storage cost was already incurred.
+        file = self._file()
+        file.size = 100  # declared a tiny file
+        file.save(update_fields=["size"])
+        storage = mock_storage_cls.return_value
+        # Already-stored real bytes alone blow past size * 1.5 (150).
+        storage.calculate_total_chunk_size.return_value = 200
+
+        res = self.client.post(
+            f"/file/{file.id}/chunk/1/", {"chunk": _tiny_upload()}, format="multipart",
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("declared file size", res.json()["error"])
+        storage.upload_bytes.assert_not_called()
+
+    @patch("files.services.upload_service.StorageGateway")
+    def test_upload_within_declared_size_still_succeeds(self, mock_storage_cls):
+        file = self._file()
+        file.size = 10_000
+        file.save(update_fields=["size"])
+        storage = mock_storage_cls.return_value
+        storage.calculate_total_chunk_size.return_value = 0
+
+        res = self.client.post(
+            f"/file/{file.id}/chunk/0/", {"chunk": _tiny_upload()}, format="multipart",
+        )
+
+        self.assertEqual(res.status_code, 200)
+        storage.upload_bytes.assert_called_once()
 
 
 def _tiny_upload():

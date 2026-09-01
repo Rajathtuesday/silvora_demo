@@ -57,6 +57,21 @@ if _SECURE:
     SECURE_HSTS_PRELOAD = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
 
+# Brute-force lockout. DRF's throttle classes (see REST_FRAMEWORK below)
+# only cover our own API views -- they have zero effect on the plain
+# Django /admin/ login form. AxesStandaloneBackend sits in
+# AUTHENTICATION_BACKENDS below, so this also covers every other call to
+# Django's authenticate() -- including the JWT login endpoint
+# (LowercaseTokenObtainPairSerializer forwards the request into
+# authenticate(), which DRF's generic views always populate) -- giving the
+# main login a real per-account lockout, not just IP-scoped rate limiting.
+# Left on the default DB-backed handler (not the cache-backed one): no
+# CACHES setting exists here, and a cache handler would desync lockout
+# state across gunicorn's multiple worker processes.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 1  # hours
+AXES_RESET_ON_SUCCESS = True
+
 # =====================================================
 # 📦 INSTALLED APPS
 # =====================================================
@@ -72,6 +87,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "axes",
 
     "files",
     "users",
@@ -81,6 +97,14 @@ INSTALLED_APPS = [
 ]
 
 AUTH_USER_MODEL = "users.User"
+
+# AxesStandaloneBackend must come first -- it's the one that actually
+# blocks a locked-out login attempt; ModelBackend does the real credential
+# check once axes lets the attempt through.
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",
+    "django.contrib.auth.backends.ModelBackend",
+]
 
 # =====================================================
 # 🔑 PASSWORD STRENGTH (critical for a Zero-Knowledge vault)
@@ -128,6 +152,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "axes.middleware.AxesMiddleware",  # must be last, per django-axes
 ]
 
 ROOT_URLCONF = "silvora_backend.urls"

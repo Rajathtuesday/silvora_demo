@@ -31,6 +31,19 @@ def integrity_key(base):
 # under a few MB. 16 MB is a generous ceiling that still rejects abuse.
 MAX_INTEGRITY_BYTES = 16 * 1024 * 1024
 
+# Hard cap on a single chunk POST. The client's real plaintext chunk size is
+# 2 MB (upload_screen.dart); XChaCha20-Poly1305 + base64 + the small JSON
+# envelope pushes that to ~2.85 MB on the wire. 4 MB leaves headroom without
+# allowing an arbitrarily large single request body.
+MAX_CHUNK_BYTES = 4 * 1024 * 1024
+
+# start() only checks the *declared* size against quota headroom -- nothing
+# previously stopped real bytes from blowing past that number before
+# commit() ever measured them. This bounds real cumulative bytes to the
+# declared size plus the same encryption-overhead margin as above, so real
+# storage cost can never exceed what start() already approved.
+CHUNK_SIZE_SAFETY_MARGIN = 1.5
+
 
 class UploadService:
 
@@ -189,7 +202,14 @@ class UploadService:
         ]:
             return {"error": "Invalid upload state"}, 400
 
+        if len(data) > MAX_CHUNK_BYTES:
+            return {"error": "Chunk too large"}, 413
+
         base = r2_base(file.tenant_id, file.owner_id, file.id)
+
+        uploaded_so_far = self.storage.calculate_total_chunk_size(base)
+        if uploaded_so_far + len(data) > file.size * CHUNK_SIZE_SAFETY_MARGIN:
+            return {"error": "Upload exceeds declared file size"}, 400
 
         self.storage.upload_bytes(
             data,

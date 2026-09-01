@@ -91,6 +91,67 @@ class LoginCaseInsensitivityTests(APITestCase):
         self.assertEqual(res.status_code, 401)
 
 
+class AdminAndLoginLockoutTests(APITestCase):
+    """django-axes: DRF's throttle classes never covered /admin/, and the
+    JWT login endpoint only ever had IP-scoped rate limiting, not a
+    per-account lockout. AxesStandaloneBackend (settings.py
+    AUTHENTICATION_BACKENDS) closes both at once, since it sits ahead of
+    ModelBackend in the same authenticate() chain both paths share."""
+
+    TOKEN = "/api/auth/token/"
+    ADMIN_LOGIN = "/admin/login/"
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(
+            username="lockout@example.com", email="lockout@example.com",
+            password=STRONG_PW, is_staff=True,
+        )
+
+    def test_repeated_wrong_password_locks_out_the_jwt_login_endpoint(self):
+        for _ in range(5):
+            res = self.client.post(
+                self.TOKEN, {"username": self.user.username, "password": "wrong"}, format="json",
+            )
+            self.assertEqual(res.status_code, 401)
+
+        # 6th attempt, even with the CORRECT password, must still fail.
+        res = self.client.post(
+            self.TOKEN, {"username": self.user.username, "password": STRONG_PW}, format="json",
+        )
+        self.assertNotEqual(res.status_code, 200)
+
+    def test_repeated_wrong_password_locks_out_admin_login(self):
+        for _ in range(5):
+            self.client.post(self.ADMIN_LOGIN, {
+                "username": self.user.username, "password": "wrong",
+            })
+
+        res = self.client.post(self.ADMIN_LOGIN, {
+            "username": self.user.username, "password": STRONG_PW,
+        })
+        # A real successful admin login redirects (302) to /admin/. Locked
+        # out, that must never happen even with the correct password.
+        self.assertNotEqual(res.status_code, 302)
+
+    def test_successful_login_resets_the_failure_counter(self):
+        for _ in range(3):
+            self.client.post(
+                self.TOKEN, {"username": self.user.username, "password": "wrong"}, format="json",
+            )
+        good = self.client.post(
+            self.TOKEN, {"username": self.user.username, "password": STRONG_PW}, format="json",
+        )
+        self.assertEqual(good.status_code, 200)
+
+        # Reset -- 3 more failures afterward is still under the limit of 5.
+        for _ in range(3):
+            res = self.client.post(
+                self.TOKEN, {"username": self.user.username, "password": "wrong"}, format="json",
+            )
+            self.assertEqual(res.status_code, 401)
+
+
 class PrivacyPolicyConsentTests(APITestCase):
     """Required, not just recorded -- see RegisterSerializer.validate_accepted_privacy_policy."""
 

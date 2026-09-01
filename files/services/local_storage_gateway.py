@@ -9,14 +9,27 @@ class StorageGateway:
         self.local_dir = os.path.join(settings.BASE_DIR, "local_r2_storage")
         os.makedirs(self.local_dir, exist_ok=True)
 
+    def _safe_join(self, *parts) -> str:
+        """Every real call site builds keys purely from UUIDs/integer FK ids
+        (see r2_base() in upload_service.py), so this is defense-in-depth,
+        not a fix for a reachable bug: os.path.join silently discards
+        local_dir if a part is absolute, and never resolves ".." on its
+        own. Reject anything that would resolve outside local_dir instead
+        of trusting every future caller to stay disciplined forever."""
+        full = os.path.normpath(os.path.join(self.local_dir, *parts))
+        root = os.path.abspath(self.local_dir)
+        if full != root and not full.startswith(root + os.sep):
+            raise ValueError(f"Unsafe storage path: {parts!r}")
+        return full
+
     def upload_bytes(self, data: bytes, key: str):
-        full_path = os.path.join(self.local_dir, key)
+        full_path = self._safe_join(key)
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, "wb") as f:
             f.write(data)
 
     def list_chunks(self, base_path: str):
-        prefix_dir = os.path.join(self.local_dir, f"{base_path}/chunks/")
+        prefix_dir = self._safe_join(f"{base_path}/chunks/")
         if not os.path.exists(prefix_dir):
             return []
 
@@ -32,11 +45,11 @@ class StorageGateway:
         return sorted(indices)
 
     def exists(self, key: str):
-        full_path = os.path.join(self.local_dir, key)
+        full_path = self._safe_join(key)
         return os.path.exists(full_path)
 
     def calculate_total_chunk_size(self, base_path: str):
-        prefix_dir = os.path.join(self.local_dir, f"{base_path}/chunks/")
+        prefix_dir = self._safe_join(f"{base_path}/chunks/")
         if not os.path.exists(prefix_dir):
             return 0
 
@@ -48,12 +61,12 @@ class StorageGateway:
         return total
 
     def download_bytes(self, key: str) -> bytes:
-        full_path = os.path.join(self.local_dir, key)
+        full_path = self._safe_join(key)
         with open(full_path, "rb") as f:
             return f.read()
 
     def list_chunk_objects(self, base_path: str):
-        prefix_dir = os.path.join(self.local_dir, f"{base_path}/chunks/")
+        prefix_dir = self._safe_join(f"{base_path}/chunks/")
         if not os.path.exists(prefix_dir):
             return []
 
@@ -71,6 +84,6 @@ class StorageGateway:
         return sorted(objects, key=lambda x: x[0])
 
     def delete_recursive(self, key_prefix: str):
-        full_path = os.path.join(self.local_dir, key_prefix)
+        full_path = self._safe_join(key_prefix)
         if os.path.exists(full_path):
             shutil.rmtree(full_path)

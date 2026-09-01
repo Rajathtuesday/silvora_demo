@@ -9,6 +9,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from files.models import FileRecord
+from files.services.storage_gateway import StorageGateway
 from tenants.models import Tenant
 
 User = get_user_model()
@@ -68,13 +69,16 @@ class PreviewEndpointsTest(TestCase):
             ],
         }
 
-        self.manifest_path = os.path.join(
-            self.tmp_dir,
-            "manifest.json",
+        # Real records only ever get a relative, R2-style manifest_path (see
+        # UploadService.commit()) -- write this one through the real
+        # StorageGateway at a relative key instead of an absolute tmp path,
+        # so it actually resolves the way production data does.
+        self.manifest_key = f"test-legacy/{uuid.uuid4()}/manifest.json"
+        self.storage = StorageGateway()
+        self.storage.upload_bytes(
+            json.dumps(self.manifest).encode("utf-8"), self.manifest_key,
         )
-
-        with open(self.manifest_path, "w", encoding="utf-8") as f:
-            json.dump(self.manifest, f)
+        self.manifest_path = self.manifest_key
 
         # -----------------------------
         # FileRecord
@@ -100,10 +104,6 @@ class PreviewEndpointsTest(TestCase):
         res = self.client.get(
             f"/download/file/{self.file.id}/manifest/"
         )
-        
-        if res.status_code == 404:
-            self.assertTrue(True)
-            return
 
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res["Content-Type"], "application/json")
@@ -130,8 +130,8 @@ class PreviewEndpointsTest(TestCase):
     def tearDown(self):
         gc.collect()
         try:
+            os.remove(self.storage._safe_join(self.manifest_key))
             os.remove(self.encrypted_path)
-            os.remove(self.manifest_path)
             os.rmdir(self.tmp_dir)
         except Exception:
             pass
