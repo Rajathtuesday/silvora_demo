@@ -69,6 +69,14 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        # Without this, a valid login session alone was enough to change the
+        # password -- a stolen/hijacked session could lock the real owner
+        # out permanently (their master key gets re-wrapped under a password
+        # only the attacker knows). DeleteAccountView already requires this
+        # same proof; this brings ChangePasswordView in line with it.
+        if not request.user.check_password(data["current_password"]):
+            return Response({"error": "Incorrect current password."}, status=status.HTTP_403_FORBIDDEN)
+
         env = get_object_or_404(MasterKeyEnvelope, user=request.user)
         with transaction.atomic():
             request.user.set_password(data["new_password"])

@@ -201,8 +201,13 @@ class RecoverSerializer(_NewPasswordEnvelope):
 
 
 class ChangePasswordSerializer(_NewPasswordEnvelope):
-    """Logged-in change: client decrypts with old password, re-wraps with new."""
-    pass
+    """Logged-in change: client decrypts with old password, re-wraps with new.
+
+    current_password is the same kind of opaque, HKDF-derived proof-of-
+    possession value DeleteAccountSerializer.password already is, not the
+    real password -- checked with check_password() in the view before
+    anything is allowed to change."""
+    current_password = serializers.CharField()
 
 
 # ========================= DELETE ACCOUNT ========================

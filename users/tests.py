@@ -341,11 +341,37 @@ class RecoveryFlowTests(APITestCase):
 
     def test_change_password_logged_in(self):
         cache.clear()
-        res = self.client.post(self.CHANGE_PW, {"new_password": self.NEW_PW, **self.ENV}, format="json")
+        res = self.client.post(
+            self.CHANGE_PW,
+            {"current_password": self.PW, "new_password": self.NEW_PW, **self.ENV},
+            format="json",
+        )
         self.assertEqual(res.status_code, 200, res.content)
         cache.clear()
         self.assertEqual(self.client.post(self.TOKEN, {"username": self.email, "password": self.PW}, format="json").status_code, 401)
         self.assertEqual(self.client.post(self.TOKEN, {"username": self.email, "password": self.NEW_PW}, format="json").status_code, 200)
+
+    def test_change_password_rejects_wrong_current_password(self):
+        """Without this check, a hijacked login session alone was enough to
+        change the password -- with no proof of the old one at all."""
+        cache.clear()
+        res = self.client.post(
+            self.CHANGE_PW,
+            {"current_password": "totally-wrong-value", "new_password": self.NEW_PW, **self.ENV},
+            format="json",
+        )
+        self.assertEqual(res.status_code, 403, res.content)
+        # Nothing committed on a rejected attempt -- old password still works.
+        cache.clear()
+        self.assertEqual(
+            self.client.post(self.TOKEN, {"username": self.email, "password": self.PW}, format="json").status_code,
+            200,
+        )
+
+    def test_change_password_requires_current_password_field(self):
+        cache.clear()
+        res = self.client.post(self.CHANGE_PW, {"new_password": self.NEW_PW, **self.ENV}, format="json")
+        self.assertEqual(res.status_code, 400, res.content)
 
     def test_setup_without_recovery_is_backward_compatible(self):
         self._logout()
