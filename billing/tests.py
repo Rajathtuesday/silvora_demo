@@ -599,6 +599,33 @@ class PlayPurchaseVerifyViewTests(APITestCase):
         mock_get.assert_called_once()
         self.assertEqual(PlayBillingSubscription.objects.filter(purchase_token="tok_retry").count(), 1)
 
+    @patch("billing.services.play_purchase_service.get_subscription_purchase")
+    @patch("billing.services.play_purchase_service.acknowledge_subscription_purchase")
+    def test_replaying_someone_elses_token_does_not_leak_their_subscription(self, mock_ack, mock_get):
+        """The idempotent-replay path (same token, same user, above) must not
+        also serve a DIFFERENT user's subscription info to whoever submits a
+        token that already belongs to someone else -- that's a real account
+        boundary, not just a re-verify optimization."""
+        mock_get.return_value = _verified_purchase(
+            obfuscated_account_id=make_obfuscated_account_id(self.user)
+        )
+        res1 = self.client.post(PLAY_VERIFY_URL, {"purchase_token": "tok_owned_by_first_user", "product_id": "silvora_pro"})
+        self.assertEqual(res1.status_code, status.HTTP_200_OK)
+
+        other_email = "otherbuyer@example.com"
+        self.client.credentials()
+        self.client.post("/api/auth/register/", {"email": other_email, "password": PW, "accepted_privacy_policy": True}, format="json")
+        cache.clear()
+        res = self.client.post("/api/auth/token/", {"username": other_email, "password": PW}, format="json")
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {res.json()['access']}")
+
+        res2 = self.client.post(PLAY_VERIFY_URL, {"purchase_token": "tok_owned_by_first_user", "product_id": "silvora_pro"})
+
+        self.assertEqual(res2.status_code, status.HTTP_400_BAD_REQUEST)
+        # The original owner's row is untouched -- still theirs, not reassigned.
+        sub = PlayBillingSubscription.objects.get(purchase_token="tok_owned_by_first_user")
+        self.assertEqual(sub.user, self.user)
+
 
 @override_settings(
     GOOGLE_PLAY_PACKAGE_NAME=PACKAGE_NAME,

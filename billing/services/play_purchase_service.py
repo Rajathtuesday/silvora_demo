@@ -197,6 +197,25 @@ def verify_and_grant_play_purchase(user, product_id: str, purchase_token: str) -
     """
     existing = PlayBillingSubscription.objects.filter(purchase_token=purchase_token).first()
     if existing:
+        if existing.user_id != user.id:
+            # Someone is submitting a purchase token already bound to a
+            # DIFFERENT account. Returning `existing` here (as the idempotent
+            # replay path below does for the legitimate same-user case) would
+            # hand this caller another user's subscription tier/status/expiry
+            # in the response -- a real, if narrow, cross-account disclosure,
+            # since a purchase token is exactly the kind of value this
+            # module's whole job is to keep from being replayable across
+            # accounts (see the module docstring). Doesn't grant anything
+            # either way -- `existing.user` is never reassigned -- but the
+            # response body must not leak.
+            logger.warning(
+                "Rejected Play purchase verify: token already belongs to a "
+                "different user (requested by user=%s, owned by user=%s)",
+                user.id, existing.user_id,
+            )
+            raise InvalidPurchaseToken(
+                "This purchase token is already associated with a different account"
+            )
         return existing
 
     verified = get_subscription_purchase(settings.GOOGLE_PLAY_PACKAGE_NAME, purchase_token)
