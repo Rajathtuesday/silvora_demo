@@ -14,6 +14,7 @@ class FileRecordAdmin(admin.ModelAdmin):
         "size",
         "upload_state",
         "security_mode",
+        "integrity_established",
         "created_at",
         "deleted_at",
     )
@@ -37,6 +38,10 @@ class FileRecordAdmin(admin.ModelAdmin):
         "deleted_at",
         "upload_state",
         "size",
+        "integrity_established",
+        "integrity_generation",
+        "integrity_sha256",
+        "manifest_sha256",
     )
 
     ordering = ("-created_at",)

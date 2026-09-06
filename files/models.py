@@ -58,6 +58,51 @@ class FileRecord(models.Model):
     # exists to replace.
     integrity_established = models.BooleanField(default=False)
 
+    # --- Rollback/replay hardening (see docs/CRYPTOGRAPHY_SPEC.md) ---
+    #
+    # The client embeds its own monotonic "version" number *inside* the
+    # encrypted integrity manifest (integrity.bin) and enforces it against a
+    # per-device trust-on-first-use record (see silvora_app's
+    # IntegrityVersionStore). The server can never read that number -- it's
+    # inside an AEAD envelope only the client can decrypt -- so the server
+    # cannot itself validate "is this version higher than the last one,"
+    # and must not pretend to. What the server CAN do without seeing
+    # plaintext is fingerprint the *bytes* it stores and refuse to serve
+    # back different bytes than the ones it fingerprinted. That is what the
+    # three fields below are for: they let download_integrity()/
+    # download_manifest() detect a compromised/malicious server (or a
+    # storage-only backup restore that reverts these objects without also
+    # reverting the DB row) substituting an old-but-validly-signed blob for
+    # the current one, closing the gap the existence-only check below
+    # (integrity_established) does not: "something is at this key" says
+    # nothing about whether it is the SAME something that was there at
+    # commit time.
+    #
+    # Never backfilled for rows that predate these fields, for the same
+    # reason integrity_established above is not backfilled: computing a
+    # fingerprint from whatever currently sits in storage would just be
+    # trusting the exact signal this feature exists to stop trusting blindly.
+    # Pre-existing files keep today's existence-only behavior until
+    # re-uploaded.
+
+    # How many times store_integrity() has (over)written integrity.bin for
+    # this file while the upload was still in flight (never client-supplied,
+    # always server-incremented -- so it is trustworthy as an audit signal
+    # even though it says nothing about the content itself). Frozen the
+    # moment commit() succeeds, since store_integrity() can never run again
+    # after that.
+    integrity_generation = models.PositiveIntegerField(default=0)
+
+    # SHA-256 (hex) of the integrity.bin bytes as of the last successful
+    # store_integrity() call. Opaque to the server either way -- hashing
+    # ciphertext requires no key and reveals nothing about the plaintext.
+    integrity_sha256 = models.CharField(max_length=64, null=True, blank=True)
+
+    # SHA-256 (hex) of manifest.json's bytes, set once inside commit() at
+    # the moment that file is written (manifest.json only exists from
+    # commit time onward -- there is no pre-commit rewrite window for it).
+    manifest_sha256 = models.CharField(max_length=64, null=True, blank=True)
+
     storage_type = models.CharField(
         max_length=10,
         default=STORAGE_R2,

@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.http import HttpResponse
 
+import hashlib
+
 from .models import FileRecord
 from .services.upload_service import UploadService, r2_base, integrity_key
 from .services.quota_service import QuotaService
@@ -284,7 +286,26 @@ def download_manifest(request, file_id):
         upload_state=FileRecord.UploadState.COMMITTED,
     )
     storage = StorageGateway()
-    return HttpResponse(storage.download_bytes(file.manifest_path), content_type="application/json")
+    data = storage.download_bytes(file.manifest_path)
+
+    # Rollback/tamper check: manifest_sha256 was fingerprinted once, inside
+    # commit(), at the moment manifest.json was written. Re-checking it here
+    # on every download catches a compromised server (or a storage-only
+    # backup restore that reverts this object without also reverting the DB
+    # row) substituting different bytes at the same, deterministic key --
+    # something the old "does the file exist" style of check could never
+    # catch, since it only asks whether *something* is there, not whether
+    # it's the *same* something that was there at commit time. Skipped for
+    # files committed before this field existed (manifest_sha256 is null;
+    # never backfilled, same reasoning as integrity_established).
+    if file.manifest_sha256:
+        if hashlib.sha256(data).hexdigest() != file.manifest_sha256:
+            return Response(
+                {"error": "Manifest content does not match what was recorded at commit"},
+                status=409,
+            )
+
+    return HttpResponse(data, content_type="application/json")
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
@@ -310,7 +331,29 @@ def download_integrity(request, file_id):
                 status=409,
             )
         return Response({"error": "Integrity manifest not found"}, status=404)
-    return HttpResponse(storage.download_bytes(key), content_type="application/octet-stream")
+
+    data = storage.download_bytes(key)
+
+    # Rollback/tamper check, same reasoning as download_manifest() above:
+    # integrity_sha256 was fingerprinted by the last successful
+    # store_integrity() call (frozen from commit time onward, since that
+    # endpoint refuses to run again once committed). A mismatch here means
+    # the bytes at this key changed since that fingerprint was recorded --
+    # tamper, or a compromised/malicious server substituting an
+    # old-but-validly-signed blob for this file. Skipped for files that
+    # predate this field (integrity_sha256 null; never backfilled, same
+    # reasoning as integrity_established).
+    if file.integrity_sha256:
+        if hashlib.sha256(data).hexdigest() != file.integrity_sha256:
+            return Response(
+                {
+                    "error": "Integrity manifest content does not match what was recorded at upload",
+                    "integrity_established": True,
+                },
+                status=409,
+            )
+
+    return HttpResponse(data, content_type="application/octet-stream")
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

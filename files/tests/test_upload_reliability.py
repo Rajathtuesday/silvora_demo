@@ -71,6 +71,13 @@ class UploadReliabilityTests(APITestCase):
         mock_quota.consume.return_value = True
 
         file = self._file()
+        # Simulates a real store_integrity() call having already run -- this
+        # test mocks storage.exists() directly instead of going through the
+        # real upload_integrity endpoint, so it needs to fill in the
+        # fingerprint bookkeeping that call would otherwise leave behind and
+        # that commit() now requires alongside it (see files/tests/test_integrity.py).
+        file.integrity_sha256 = "0" * 64
+        file.save(update_fields=["integrity_sha256"])
         first = self.client.post(f"/file/{file.id}/commit/")
         self.assertEqual(first.status_code, 200)
         self.assertEqual(first.json()["status"], "committed")

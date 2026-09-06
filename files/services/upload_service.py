@@ -257,6 +257,14 @@ class UploadService:
         base = r2_base(file.tenant_id, file.owner_id, file.id)
         self.storage.upload_bytes(data, integrity_key(base))
 
+        # Fingerprint what was actually written, and bump the rewrite
+        # counter -- both purely server-observed, never client-supplied, so
+        # both stay trustworthy as an audit trail even though the server
+        # can't read what's inside. See the field comments on FileRecord.
+        file.integrity_generation += 1
+        file.integrity_sha256 = hashlib.sha256(data).hexdigest()
+        file.save(update_fields=["integrity_generation", "integrity_sha256"])
+
         return {"stored": True}, 200
 
     # ========================================================
@@ -303,6 +311,15 @@ class UploadService:
         # integrity manifest, so downloads can always be verified end to end.
         if not self.storage.exists(integrity_key(base)):
             return {"error": "Integrity manifest missing"}, 400
+
+        # Belt-and-suspenders alongside the existence check above: every
+        # successful store_integrity() call records a fingerprint (see that
+        # method). If it's somehow missing here despite the object existing
+        # in storage, the DB and storage have desynced -- don't commit on
+        # top of that, since integrity_sha256 is what download_integrity()
+        # will pin against forever afterward.
+        if not file.integrity_sha256:
+            return {"error": "Integrity manifest fingerprint missing"}, 400
 
         manifest_chunks = []
         offset = 0
@@ -351,6 +368,11 @@ class UploadService:
         file.final_path = base
         file.manifest_path = manifest_key
         file.integrity_established = True  # proven by the gate above; durable even if integrity.bin is deleted later
+        # manifest.json is only ever written here, once, so this fingerprint
+        # is set exactly once and stays valid for the file's lifetime --
+        # download_manifest() pins against it the same way download_integrity()
+        # pins against integrity_sha256.
+        file.manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
 
         file.save(update_fields=[
             "size",
@@ -358,6 +380,7 @@ class UploadService:
             "final_path",
             "manifest_path",
             "integrity_established",
+            "manifest_sha256",
         ])
 
         return {"status": "committed"}, 200
