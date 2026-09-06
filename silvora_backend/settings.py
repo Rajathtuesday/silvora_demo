@@ -194,7 +194,21 @@ DATABASES = {
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [BASE_DIR / "static"]  # project-level assets (e.g. the downloadable APK)
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# STATICFILES_STORAGE is deprecated as of Django 5.1 in favor of the STORAGES
+# dict (still works today with a deprecation warning, removed entirely in a
+# future release). "default" is Django's own plain filesystem storage --
+# unused here since user files never touch Django's storage framework at
+# all, they go straight to R2 via the custom StorageGateway -- but STORAGES
+# requires both keys to be set.
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
