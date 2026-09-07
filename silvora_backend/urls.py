@@ -29,8 +29,7 @@ from .admin_tools import send_tester_switch_email
 from billing.views import billing_checkout_page
 
 # SimpleJWT views
-from rest_framework_simplejwt.views import TokenRefreshView
-from users.views import ThrottledTokenObtainPairView
+from users.views import ThrottledTokenObtainPairView, SafeTokenRefreshView
 
 
 def robots_txt(request):
@@ -109,7 +108,7 @@ urlpatterns = [
 
     # auth/token endpoints
     path('api/auth/token/', ThrottledTokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/token/refresh/', SafeTokenRefreshView.as_view(), name='token_refresh'),
 
     # Register & masterkey: these views are defined in users.views
     path('api/auth/', include('users.urls')),

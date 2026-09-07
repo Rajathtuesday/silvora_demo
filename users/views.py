@@ -7,10 +7,10 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from .models import User
-from .serializers import LowercaseTokenObtainPairSerializer, RegisterSerializer
+from .serializers import LowercaseTokenObtainPairSerializer, RegisterSerializer, SafeTokenRefreshSerializer
 from .services import send_verification_email, unsign_verification_token
 
 logger = logging.getLogger("silvora.users")
@@ -20,6 +20,12 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
     """Login endpoint, rate-limited via the 'login' scope to blunt brute force."""
     serializer_class = LowercaseTokenObtainPairSerializer
     throttle_scope = "login"
+
+
+class SafeTokenRefreshView(TokenRefreshView):
+    """See SafeTokenRefreshSerializer -- returns a clean 401 instead of a
+    500 when the refresh token's user has since been deleted."""
+    serializer_class = SafeTokenRefreshSerializer
 
 
 class RegisterView(APIView):

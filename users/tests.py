@@ -769,3 +769,44 @@ class EmailVerificationTests(APITestCase):
     def test_me_requires_authentication(self):
         res = self.client.get("/api/auth/me/")
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class TokenRefreshAfterAccountDeletionTests(APITestCase):
+    """Real production incident, 2026-09-07: a user deleted their own
+    account while the app still held a valid refresh token from that
+    session. The app's background polling then tried to silently refresh
+    it, and the stock SimpleJWT serializer crashed with an unhandled
+    User.DoesNotExist (500) instead of a clean 401. See
+    SafeTokenRefreshSerializer in serializers.py."""
+
+    REGISTER = "/api/auth/register/"
+    TOKEN = "/api/auth/token/"
+    REFRESH = "/api/auth/token/refresh/"
+    DELETE = "/api/auth/account/delete/"
+    PW = "Str0ng!Vault#Key2026"
+
+    def setUp(self):
+        cache.clear()
+
+    def test_refresh_after_account_deletion_returns_401_not_500(self):
+        self.client.post(self.REGISTER, {"email": "ghost@example.com", "password": self.PW, "accepted_privacy_policy": True}, format="json")
+        token_res = self.client.post(self.TOKEN, {"username": "ghost@example.com", "password": self.PW}, format="json")
+        access = token_res.json()["access"]
+        refresh = token_res.json()["refresh"]
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
+        self.client.post(self.DELETE, {"password": self.PW}, format="json")
+        self.client.credentials()  # drop auth header for the logged-out refresh call
+
+        res = self.client.post(self.REFRESH, {"refresh": refresh}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_refresh_still_works_for_an_existing_user(self):
+        """Guards against the fix breaking the ordinary, non-deleted case."""
+        self.client.post(self.REGISTER, {"email": "alive@example.com", "password": self.PW, "accepted_privacy_policy": True}, format="json")
+        token_res = self.client.post(self.TOKEN, {"username": "alive@example.com", "password": self.PW}, format="json")
+        refresh = token_res.json()["refresh"]
+
+        res = self.client.post(self.REFRESH, {"refresh": refresh}, format="json")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("access", res.json())

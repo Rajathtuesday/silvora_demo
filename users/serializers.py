@@ -3,9 +3,11 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.hashers import make_password
+from django.core.exceptions import ObjectDoesNotExist
 from django.utils import timezone
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 
 from .models import MasterKeyEnvelope
 
@@ -24,6 +26,23 @@ class LowercaseTokenObtainPairSerializer(TokenObtainPairSerializer):
         if isinstance(value, str):
             attrs[self.username_field] = value.strip().lower()
         return super().validate(attrs)
+
+
+class SafeTokenRefreshSerializer(TokenRefreshSerializer):
+    """Real production incident, 2026-09-07: a user deleted their own
+    account while the app still held a valid-looking refresh token. The
+    app's background polling then tried to silently refresh the session,
+    and the stock serializer's validate() does an unguarded
+    get_user_model().objects.get() on the token's embedded user id --
+    with that user gone, this raised User.DoesNotExist uncaught, producing
+    a 500 instead of a 401 the client already knows how to handle (log out,
+    show the login screen)."""
+
+    def validate(self, attrs):
+        try:
+            return super().validate(attrs)
+        except ObjectDoesNotExist:
+            raise InvalidToken("No active account found for the given token.")
 
 
 def _from_hex(value, field, exact_len=None, min_len=None):
