@@ -151,6 +151,81 @@ class AdminAndLoginLockoutTests(APITestCase):
             )
             self.assertEqual(res.status_code, 401)
 
+    def test_two_real_visitors_get_independent_lockouts_not_a_shared_one(self):
+        """Real incident, 2026-09-07: behind Render's proxy, every visitor's
+        request.META['REMOTE_ADDR'] is identically Render's own internal
+        address -- without AXES_CLIENT_IP_CALLABLE resolving the real
+        X-Forwarded-For value, axes was tracking every user on the whole
+        platform as the exact same "client". Five failed attempts against
+        ANY account, from ANYONE, locked EVERY real user out of logging in
+        for the next hour. This is what actually broke a brand-new user's
+        very first login, seconds after successfully registering, with
+        zero failed attempts of their own.
+
+        Simulates two different real visitors (distinct X-Forwarded-For
+        values, the same REMOTE_ADDR Django would actually see behind the
+        real proxy) to prove they no longer share one lockout bucket."""
+        other_user = User.objects.create_user(
+            username="other-visitor@example.com", email="other-visitor@example.com",
+            password=STRONG_PW,
+        )
+
+        # Visitor A fails enough times to lock themselves out.
+        for _ in range(5):
+            self.client.post(
+                self.TOKEN, {"username": self.user.username, "password": "wrong"},
+                format="json", HTTP_X_FORWARDED_FOR="203.0.113.10",
+            )
+
+        # Visitor B, a completely different real person on a different real
+        # IP, must be able to log into THEIR OWN account with THEIR OWN
+        # correct password without being caught in visitor A's lockout.
+        res = self.client.post(
+            self.TOKEN, {"username": other_user.username, "password": STRONG_PW},
+            format="json", HTTP_X_FORWARDED_FOR="198.51.100.20",
+        )
+        self.assertEqual(res.status_code, 200)
+
+        # Visitor A themselves must still actually be locked out (proves
+        # this test isn't passing simply because lockout stopped working).
+        still_locked = self.client.post(
+            self.TOKEN, {"username": self.user.username, "password": STRONG_PW},
+            format="json", HTTP_X_FORWARDED_FOR="203.0.113.10",
+        )
+        self.assertNotEqual(still_locked.status_code, 200)
+
+
+class GetClientIpTests(APITestCase):
+    """silvora_backend/utils.py::get_client_ip -- the actual fix, tested on
+    its own as a plain function, not just through the axes integration
+    above."""
+
+    def test_uses_the_first_hop_in_x_forwarded_for(self):
+        from silvora_backend.utils import get_client_ip
+
+        class FakeRequest:
+            META = {"HTTP_X_FORWARDED_FOR": "203.0.113.10, 10.0.0.1, 10.0.0.2", "REMOTE_ADDR": "127.0.0.1"}
+
+        self.assertEqual(get_client_ip(FakeRequest()), "203.0.113.10")
+
+    def test_falls_back_to_remote_addr_with_no_forwarded_header(self):
+        """The real behavior for a direct/local connection with no proxy in
+        front at all -- must not break local development."""
+        from silvora_backend.utils import get_client_ip
+
+        class FakeRequest:
+            META = {"REMOTE_ADDR": "127.0.0.1"}
+
+        self.assertEqual(get_client_ip(FakeRequest()), "127.0.0.1")
+
+    def test_strips_whitespace_around_the_forwarded_ip(self):
+        from silvora_backend.utils import get_client_ip
+
+        class FakeRequest:
+            META = {"HTTP_X_FORWARDED_FOR": "  203.0.113.10  , 10.0.0.1", "REMOTE_ADDR": "127.0.0.1"}
+
+        self.assertEqual(get_client_ip(FakeRequest()), "203.0.113.10")
+
 
 class PrivacyPolicyConsentTests(APITestCase):
     """Required, not just recorded -- see RegisterSerializer.validate_accepted_privacy_policy."""

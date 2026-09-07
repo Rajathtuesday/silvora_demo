@@ -72,6 +72,15 @@ AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1  # hours
 AXES_RESET_ON_SUCCESS = True
 
+# Without this, axes falls back to request.META['REMOTE_ADDR'], which
+# behind Render's reverse proxy is always Render's own internal proxy
+# address -- every visitor to the whole platform was being tracked as the
+# exact same "client" for lockout purposes, so five failed attempts from
+# anyone, anywhere, locked every real user out of logging in for the next
+# hour. See silvora_backend/utils.py::get_client_ip for the real incident
+# this closes and why X-Forwarded-For can be trusted here.
+AXES_CLIENT_IP_CALLABLE = "silvora_backend.utils.get_client_ip"
+
 # =====================================================
 # 📦 INSTALLED APPS
 # =====================================================
