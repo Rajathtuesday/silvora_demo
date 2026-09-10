@@ -6,6 +6,14 @@ project history. For anything earlier, `git log` is the source of truth.
 
 ---
 
+## 2026-09-11
+
+### Fixed
+- **The marketing homepage had no og:image or twitter:image at all** - every shared link (WhatsApp, Twitter, LinkedIn, Slack) rendered as a bare text card with no visual, undercutting a product whose whole pitch is trust and polish. Added a real 1200x630 share image built from the actual unlock screen.
+- **Zero images anywhere on the page** - only a canvas-drawn animation, nothing for Google Images and nothing proving the product looks like what the copy claims. Added a "See It In Action" section with two real screenshots (vault unlock, file list), both with descriptive alt text.
+
+---
+
 ## 2026-09-07
 
 ### Fixed
