@@ -25,9 +25,15 @@
 <meta property="og:description" content="End-to-End Encrypted cloud storage service built and operated from India. Your data, your control.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://silvora.cloud">
+<meta property="og:site_name" content="Silvora Cloud">
+<meta property="og:image" content="https://silvora.cloud{% static 'og-image.jpg' %}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="en_IN">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Silvora Cloud - E2EE Cloud Storage Made in India">
 <meta name="twitter:description" content="End-to-End Encrypted cloud storage service built and operated from India.">
+<meta name="twitter:image" content="https://silvora.cloud{% static 'og-image.jpg' %}">
 
 <!-- JSON-LD STRUCTURED DATA - MOST IMPORTANT FOR AI/SEARCH ENGINES -->
 <script type="application/ld+json">
@@ -294,6 +300,36 @@ section {
   transform: translateY(-2px);
 }
 
+/* Screenshots */
+.screens {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  flex-wrap: wrap;
+  margin-top: 44px;
+}
+.screen-card {
+  text-align: center;
+  max-width: 230px;
+}
+.screen-frame {
+  border-radius: 28px;
+  border: 6px solid var(--card);
+  background: var(--card);
+  overflow: hidden;
+  box-shadow: 0 30px 60px rgba(0,0,0,0.45);
+}
+.screen-frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.screen-caption {
+  margin-top: 16px;
+  font-size: 0.92rem;
+  opacity: 0.75;
+}
+
 /* Features */
 .features {
   display: grid;
@@ -536,6 +572,25 @@ footer a {
     <input type="text" id="cipher-input" class="cipher-input" placeholder="Type anything, e.g. a diary entry" maxlength="60" autocomplete="off">
     <div class="cipher-output" id="cipher-output"><span class="cipher-caret">Your encrypted output appears here</span></div>
     <div class="cipher-demo-note">Illustrative only, run entirely in your browser. Nothing you type here is sent anywhere. Real files are encrypted on your device with XChaCha20-Poly1305 before they ever leave it.</div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <h2 style="text-align:center;margin-bottom:12px;">See It In Action</h2>
+  <p style="text-align:center;opacity:0.7;max-width:500px;margin:0 auto;">Real screens from the app, not mockups.</p>
+  <div class="screens">
+    <div class="screen-card">
+      <div class="screen-frame">
+        <img src="{% static 'screenshots/vault-unlock.jpg' %}" alt="Silvora's unlock screen, entering a master password to open an encrypted vault" width="270" height="578" loading="lazy">
+      </div>
+      <div class="screen-caption">Your master password never leaves your device</div>
+    </div>
+    <div class="screen-card">
+      <div class="screen-frame">
+        <img src="{% static 'screenshots/vault-files.jpg' %}" alt="Silvora's vault screen showing an encrypted file and storage usage" width="270" height="578" loading="lazy">
+      </div>
+      <div class="screen-caption">Files stay encrypted from the moment they're added</div>
+    </div>
   </div>
 </section>
 
