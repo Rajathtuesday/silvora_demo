@@ -1,0 +1,37 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Thanks - Silvora Beta Feedback</title>
+<link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080910; --primary: #5B4FE8; --gold: #D4AF6A;
+    --text: #FFFFFF; --text-secondary: #8A8FAA;
+    --font-display: "Syne", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: "DM Sans", sans-serif; display: flex; align-items: center; justify-content: center;
+  }
+  .card { max-width: 460px; padding: 2rem 1.4rem; text-align: center; }
+  .logo { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; margin-bottom: 1.6rem; }
+  .logo span { color: var(--gold); }
+  h1 { font-family: var(--font-display); font-size: 1.6rem; margin: 0 0 0.8rem; }
+  p { color: var(--text-secondary); font-size: 0.98rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Silvora<span>.</span></div>
+    <h1>Got it, thank you.</h1>
+    <p>Your feedback was recorded. If you mentioned a bug or something confusing, there's a real chance it gets fixed before this goes public, and you can keep using the app exactly as before.</p>
+  </div>
+</body>
+</html>

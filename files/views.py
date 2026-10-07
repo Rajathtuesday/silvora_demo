@@ -75,8 +75,10 @@ def upload_chunk(request, file_id, index):
     if not blob:
         return Response({"error": "Missing chunk"}, status=400)
 
+    raw = blob.read()
+
     service = UploadService(request.user)
-    data, status_code = service.upload_chunk(file_id, index, blob.read())
+    data, status_code = service.upload_chunk(file_id, index, raw)
     return Response(data, status=status_code)
 
 @api_view(["POST"])

@@ -101,6 +101,7 @@ INSTALLED_APPS = [
     "files",
     "users",
     "billing",
+    "feedback",
     "tenants.apps.TenantsConfig",
     "django_extensions",
 ]

@@ -1,0 +1,156 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Silvora Beta Feedback</title>
+<link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080910;
+    --surface: #0F1018;
+    --card: #141620;
+    --primary: #5B4FE8;
+    --primary-light: #7B6FF8;
+    --gold: #D4AF6A;
+    --text: #FFFFFF;
+    --text-secondary: #8A8FAA;
+    --text-muted: #4A4F6A;
+    --border: #232639;
+    --danger: #E8607A;
+    --font-display: "Syne", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "DM Sans", sans-serif;
+    line-height: 1.6;
+  }
+  h1, h2 { font-family: var(--font-display); }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 4rem 1.4rem 6rem; }
+
+  .logo { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 2.2rem; }
+  .logo span { color: var(--gold); }
+
+  h1 { font-size: clamp(1.6rem, 4vw, 2.1rem); font-weight: 700; margin: 0 0 0.7rem; }
+  .lede { color: var(--text-secondary); font-size: 0.98rem; margin: 0 0 2.4rem; }
+
+  .errors {
+    background: rgba(232,96,122,0.1); border: 1px solid var(--danger); border-radius: 10px;
+    padding: 1rem 1.3rem; margin-bottom: 2rem; color: #ffd6de; font-size: 0.9rem;
+  }
+  .errors ul { margin: 0.4rem 0 0; padding-left: 1.1rem; }
+
+  fieldset { border: none; padding: 0; margin: 0 0 2.2rem; }
+  legend { font-family: var(--font-display); font-weight: 600; font-size: 1rem; color: var(--text); margin-bottom: 0.9rem; padding: 0; }
+  .hint { color: var(--text-muted); font-size: 0.82rem; margin: -0.6rem 0 0.9rem; }
+
+  .option-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+  .option {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.65rem 1rem; cursor: pointer; display: flex; align-items: center; gap: 0.55rem;
+    font-size: 0.92rem; color: var(--text-secondary); transition: border-color .15s, color .15s;
+  }
+  .option:has(input:checked) { border-color: var(--primary-light); color: var(--text); }
+  .option input { accent-color: var(--primary-light); }
+
+  textarea, input[type="text"] {
+    width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    color: var(--text); font-family: "DM Sans", sans-serif; font-size: 0.94rem; padding: 0.8rem 1rem;
+    resize: vertical; min-height: 5rem;
+  }
+  input[type="text"] { min-height: unset; }
+  textarea:focus, input[type="text"]:focus, .option:has(input:focus-visible) { outline: 2px solid var(--primary-light); outline-offset: 1px; }
+
+  .rating-row { display: flex; gap: 0.5rem; }
+  .rating-row .option { flex: 1; justify-content: center; padding: 0.75rem 0; }
+
+  button {
+    width: 100%; background: var(--primary); color: #fff; border: none; border-radius: 10px;
+    font-family: "DM Sans", sans-serif; font-weight: 600; font-size: 1rem; padding: 0.95rem;
+    cursor: pointer; transition: background .15s;
+  }
+  button:hover { background: var(--primary-light); }
+
+  .foot-note { color: var(--text-muted); font-size: 0.82rem; text-align: center; margin-top: 1.4rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="logo">Silvora<span>.</span></div>
+  <h1>How's the beta going?</h1>
+  <p class="lede">Two minutes, honest answers only. This directly decides what gets fixed before launch, including things that flat-out didn't work.</p>
+
+  {% if errors %}
+    <div class="errors">
+      <strong>A couple of things need fixing:</strong>
+      <ul>{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <fieldset>
+      <legend>How many days have you actually opened and used Silvora in the last two weeks?</legend>
+      <div class="option-row">
+        <label class="option"><input type="radio" name="days_used" value="0" required {% if posted.days_used == "0" %}checked{% endif %}> 0 days</label>
+        <label class="option"><input type="radio" name="days_used" value="1-2" {% if posted.days_used == "1-2" %}checked{% endif %}> 1-2 days</label>
+        <label class="option"><input type="radio" name="days_used" value="3-5" {% if posted.days_used == "3-5" %}checked{% endif %}> 3-5 days</label>
+        <label class="option"><input type="radio" name="days_used" value="6+" {% if posted.days_used == "6+" %}checked{% endif %}> 6+ days</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>What did you use it for?</legend>
+      <div class="option-row">
+        <label class="option"><input type="checkbox" name="used_uploading" {% if posted.used_uploading %}checked{% endif %}> Uploading files</label>
+        <label class="option"><input type="checkbox" name="used_downloading" {% if posted.used_downloading %}checked{% endif %}> Downloading files</label>
+        <label class="option"><input type="checkbox" name="used_recovery_phrase" {% if posted.used_recovery_phrase %}checked{% endif %}> Testing the recovery phrase</label>
+        <label class="option"><input type="checkbox" name="used_just_looking" {% if posted.used_just_looking %}checked{% endif %}> Just looking around</label>
+      </div>
+      <input type="text" name="used_other" placeholder="Something else? (optional)" style="margin-top:0.6rem;" value="{{ posted.used_other|default:'' }}">
+    </fieldset>
+
+    <fieldset>
+      <legend>Did anything crash, freeze, or just not work?</legend>
+      <div class="hint">"Nothing" is a completely fine answer.</div>
+      <textarea name="problems">{{ posted.problems|default:'' }}</textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>What's confusing or harder than it should be?</legend>
+      <textarea name="confusing">{{ posted.confusing|default:'' }}</textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>Would you actually keep using this after the beta? Why or why not?</legend>
+      <textarea name="would_keep_using">{{ posted.would_keep_using|default:'' }}</textarea>
+    </fieldset>
+
+    <fieldset>
+      <legend>Rate your overall experience</legend>
+      <div class="rating-row">
+        {% for n in "12345" %}
+        <label class="option"><input type="radio" name="rating" value="{{ n }}" required {% if posted.rating == n %}checked{% endif %}> {{ n }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Anything else you want to tell me? <span style="font-weight:400;color:var(--text-muted);">(optional)</span></legend>
+      <textarea name="other_comments">{{ posted.other_comments|default:'' }}</textarea>
+    </fieldset>
+
+    <button type="submit">Send feedback</button>
+    <div class="foot-note">Goes straight to Rajath. Not shared anywhere else.</div>
+  </form>
+</div>
+</body>
+</html>

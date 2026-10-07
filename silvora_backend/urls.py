@@ -115,6 +115,9 @@ urlpatterns = [
 
     # Files endpoints
     path('', include('files.urls')),
+
+    # Beta tester feedback form
+    path('beta-feedback/', include('feedback.urls')),
         # NEW: master key endpoints
 
     # Billing (Razorpay subscriptions)

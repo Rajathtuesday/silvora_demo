@@ -6,6 +6,13 @@ project history. For anything earlier, `git log` is the source of truth.
 
 ---
 
+## 2026-09-12
+
+### Added
+- **A beta-tester feedback form at `/beta-feedback/`.** Google Play rejected production access, asking for more closed-testing engagement and evidence of gathering/acting on tester feedback. New `feedback` app: a plain form (days used, what they tried, bugs, confusion points, would-they-keep-using, a 1-5 rating), saved to a `TesterFeedback` model, viewable read-only in Django admin. No third-party dependency, no Google account needed by testers.
+
+---
+
 ## 2026-09-11
 
 ### Fixed
