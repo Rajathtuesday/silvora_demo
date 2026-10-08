@@ -1,0 +1,170 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}{% endblock %}</title>
+<meta name="description" content="{% block description %}{% endblock %}">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+<link rel="canonical" href="https://silvora.cloud{{ request.path }}">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Silvora">
+<meta property="og:title" content="{% block og_title %}{% endblock %}">
+<meta property="og:description" content="{% block og_description %}{% endblock %}">
+<meta property="og:url" content="https://silvora.cloud{{ request.path }}">
+<meta property="og:locale" content="en_IN">
+<link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
+<link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon/apple-touch-icon.png' %}">
+{% block structured_data %}{% endblock %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #080910; --surface: #0F1018; --card: #141620;
+    --primary: #5B4FE8; --primary-light: #7B6FF8; --gold: #D4AF6A;
+    --text: #FFFFFF; --text-secondary: #8A8FAA; --text-muted: #4A4F6A;
+    --border: #232639; --ok: #3DD68C; --warn: #FFB84D;
+    --font-display: "Syne", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "DM Sans", sans-serif; line-height: 1.7; }
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; }
+  a { color: var(--primary-light); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--primary-light); outline-offset: 3px; }
+
+  /* Nav: same structure and behaviour as the landing page */
+  .nav { position: sticky; top: 0; z-index: 100; padding: 28px 6vw; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid transparent; transition: background .3s ease, border-color .3s ease; }
+  .nav.scrolled { background: rgba(8,9,16,0.82); backdrop-filter: blur(14px); border-bottom-color: var(--border); }
+  .logo { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--text); }
+  .logo:hover { text-decoration: none; }
+  .dot { color: var(--primary); }
+  .nav-links { display: flex; gap: 24px; align-items: center; }
+  .nav-links a { color: var(--text); opacity: .8; font-size: 0.95rem; transition: opacity .25s; }
+  .nav-links a:hover { opacity: 1; text-decoration: none; }
+  .nav-links a[aria-current] { opacity: 1; color: var(--gold); }
+  .nav-download { padding: 10px 22px; border-radius: 10px; background: var(--primary); font-weight: 600 !important; font-size: 0.9rem !important; opacity: 1 !important; }
+  .nav-download:hover { opacity: .85 !important; }
+
+  /* Page */
+  .hero { max-width: 820px; margin: 0 auto; padding: 56px 24px 24px; text-align: center; }
+  .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); }
+  .hero h1 { font-size: clamp(32px, 5.5vw, 50px); line-height: 1.12; margin: 14px 0 18px; }
+  .hero h1 span { background: linear-gradient(120deg, var(--primary-light), var(--gold)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .lede { color: var(--text-secondary); font-size: 1.1rem; max-width: 640px; margin: 0 auto; }
+  .actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 28px; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 26px; border-radius: 12px; background: var(--primary); color: #fff; font-weight: 600; }
+  .btn:hover { opacity: .88; text-decoration: none; }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn.ghost:hover { border-color: var(--primary-light); }
+
+  .wrap { max-width: 900px; margin: 0 auto; padding: 24px 24px 40px; }
+  section { margin: 72px 0; }
+  .label { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--primary-light); margin-bottom: 8px; }
+  h2 { font-size: clamp(24px, 3.6vw, 32px); line-height: 1.2; margin: 0 0 14px; }
+  h3 { font-size: 17px; margin: 0 0 6px; }
+  p, li { color: var(--text-secondary); font-size: 1rem; }
+  p b, li b { color: var(--text); font-weight: 600; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  code { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 0.86em; color: var(--gold); }
+
+  .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 22px; }
+  .cards.two { grid-template-columns: 1fr 1fr; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 22px; }
+  .card p { margin: 0; font-size: 0.95rem; }
+  .card .k { font-family: var(--font-display); font-size: 13px; color: var(--gold); letter-spacing: .08em; text-transform: uppercase; display: block; margin-bottom: 10px; }
+  .card.pick { border-color: rgba(123,111,248,.45); background: linear-gradient(160deg, rgba(91,79,232,.12), var(--card) 55%); }
+
+  figure { margin: 24px 0 0; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; min-width: 560px; color: var(--text); font-family: "DM Sans", sans-serif; }
+  figcaption { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; }
+
+  .tw { overflow-x: auto; margin-top: 18px; border: 1px solid var(--border); border-radius: 14px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; min-width: 560px; }
+  th, td { padding: 13px 16px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  th { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted); background: var(--surface); }
+  td { color: var(--text-secondary); }
+  td:first-child { color: var(--text); font-weight: 500; }
+  .yes { color: var(--ok); font-weight: 600; }
+  .no { color: var(--warn); font-weight: 600; }
+  .note { font-size: 0.85rem; color: var(--text-muted); margin-top: 12px; }
+
+  .honest { border-left: 3px solid var(--gold); padding: 4px 0 4px 20px; }
+  .faq details { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 4px 20px; margin-bottom: 10px; }
+  .faq summary { cursor: pointer; font-weight: 600; padding: 14px 0; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; color: var(--primary-light); font-size: 1.3rem; line-height: 1; }
+  .faq details[open] summary::after { content: "\2212"; }
+  .faq details p { margin: 0 0 16px; }
+
+  .cta { text-align: center; background: linear-gradient(160deg, rgba(91,79,232,.18), rgba(212,175,106,.08)); border: 1px solid var(--border); border-radius: 22px; padding: 48px 24px; }
+  .cta p { max-width: 520px; margin: 0 auto 22px; }
+
+  footer { text-align: center; padding: 35px; font-size: .9rem; margin-top: 24px; }
+  footer, footer a { color: rgba(255,255,255,.5); }
+  footer a { text-decoration: underline; }
+  footer .links { margin-top: 8px; }
+
+  .reveal { opacity: 0; transform: translateY(16px); transition: opacity .6s ease, transform .6s ease; }
+  .reveal.in-view { opacity: 1; transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
+  @media (max-width: 768px) {
+    .nav { padding: 20px 6vw; }
+    .nav-links { gap: 14px; }
+    .nav-links a:not(.nav-download) { display: none; }
+    .cards, .cards.two { grid-template-columns: 1fr; }
+    section { margin: 56px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <a href="/" class="logo">Silvora<span class="dot">.</span></a>
+  <nav class="nav-links" aria-label="Main">
+    <a href="/">Home</a>
+    <a href="/security/"{% if request.path == "/security/" %} aria-current="page"{% endif %}>Security</a>
+    <a href="/vs-google-drive/"{% if request.path == "/vs-google-drive/" %} aria-current="page"{% endif %}>vs Google Drive</a>
+    <a href="/#pricing">Pricing</a>
+    <a class="nav-download" href="{{ play_store_url }}">Get the app</a>
+  </nav>
+</header>
+
+<main>
+{% block content %}{% endblock %}
+</main>
+
+<footer>
+  &copy; {% now "Y" %} Silvora Cloud - End-to-End Encrypted Cloud Storage Made in India.<br>
+  <small style="opacity:0.7;">Your Cloud. Your Control. Your Country.</small>
+  <div class="links"><small><a href="/security/">How encryption works</a> &middot; <a href="/vs-google-drive/">Silvora vs Google Drive</a> &middot; <a href="/privacy/">Privacy Policy</a> &middot; <a href="/terms/">Terms of Service</a></small></div>
+</footer>
+
+<script>
+(function navScroll() {
+  const nav = document.querySelector('.nav');
+  if (!nav) return;
+  const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 40);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();
+(function scrollReveal() {
+  const targets = document.querySelectorAll('.reveal');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion || !('IntersectionObserver' in window)) {
+    targets.forEach(t => t.classList.add('in-view'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in-view'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  targets.forEach(t => io.observe(t));
+})();
+</script>
+</body>
+</html>

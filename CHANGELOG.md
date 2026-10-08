@@ -6,6 +6,17 @@ project history. For anything earlier, `git log` is the source of truth.
 
 ---
 
+## 2026-10-08
+
+### Added
+- **Two public pages: `/security/` and `/vs-google-drive/`.** Security explains, in plain words and then in detail, how files are locked on the phone, the key family (master key, password and recovery paths, per-file keys), login without sending the password, what the server can and can't see (matches the privacy policy), tamper checks, device protections and honest limits (metadata, a hacked phone, weak passwords, Android only, no independent audit yet). The comparison is fair to Drive (features, free space, platforms, recovery) and says where Silvora differs. Both share `templates/landing/_info_base.html` and carry FAQ structured data matching the visible questions. Footer links on every public page.
+
+### Changed
+- **One Play Store link for every download button:** `settings.PLAY_STORE_URL` through a `site_links` context processor, now the store listing (`details?id=cloud.silvora.app`) instead of the closed-testing join page hard-coded in five places. Ship this with the open testing release.
+- **One list of public pages,** `PUBLIC_PAGES` in `silvora_backend/pages.py`, read by both `sitemap.xml` and `robots.txt`. Tests: `silvora_backend/tests_public_pages.py` (every page served, listed, allowed; no template hard-codes the testing link; FAQ schema matches).
+
+---
+
 ## 2026-09-12
 
 ### Added

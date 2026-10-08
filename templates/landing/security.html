@@ -1,0 +1,202 @@
+{% extends "landing/_info_base.html" %}
+{% block title %}How Silvora's End-to-End Encryption Works | Silvora{% endblock %}
+{% block description %}Your files are encrypted on your phone before upload, with keys only you hold. Here's exactly what Silvora's server can and can't see, in plain words.{% endblock %}
+{% block og_title %}How Silvora's end-to-end encryption works{% endblock %}
+{% block og_description %}Files are locked on your phone before upload. What Silvora's server can and can't see, in plain words.{% endblock %}
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Can anyone at Silvora see my photos?", "acceptedAnswer": {"@type": "Answer", "text": "No. They're encrypted on your phone before upload, and the key never leaves your phone in a form anyone else can use. We store scrambled bytes we can't open."}},
+    {"@type": "Question", "name": "What if someone orders Silvora to hand over my files?", "acceptedAnswer": {"@type": "Answer", "text": "We can only hand over what we hold: your email address, file sizes, timestamps and encrypted data we can't read. We have no way to decrypt your files or filenames."}},
+    {"@type": "Question", "name": "What happens to my files if Silvora shuts down?", "acceptedAnswer": {"@type": "Answer", "text": "Use Settings, then Export My Data, in the app. It downloads every file and decrypts it on your phone, so you have your own copy that doesn't depend on us."}},
+    {"@type": "Question", "name": "Is end-to-end encryption on the free plan too?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Every plan, including the free 1 GB, uses exactly the same encryption. Paying only gets you more space."}},
+    {"@type": "Question", "name": "Can I change my password without re-uploading everything?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Your files are locked with keys made from your master key, not from your password. Changing your password only re-locks the master key, which takes a moment."}}
+  ]
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="hero">
+  <div class="eyebrow">Security, explained</div>
+  <h1>We built Silvora so <span>we can't read your files.</span></h1>
+  <p class="lede">Most cloud drives encrypt your files with keys the company holds. Silvora locks your files on your phone, with keys that never leave it. This page explains how, in plain words first and in detail after.</p>
+  <div class="actions">
+    <a class="btn" href="{{ play_store_url }}">Get Silvora on Android</a>
+    <a class="btn ghost" href="/vs-google-drive/">Compare with Google Drive</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="reveal">
+    <div class="label">The short version</div>
+    <h2>Three things to know.</h2>
+    <div class="cards">
+      <div class="card"><span class="k">Locked on your phone</span><p>Every file, and every filename, is encrypted on your phone before it's uploaded. Nothing readable leaves the device.</p></div>
+      <div class="card"><span class="k">Stored as noise</span><p>Our servers keep only scrambled bytes. Someone who broke into them would find nothing they could open.</p></div>
+      <div class="card"><span class="k">Only you can unlock</span><p>Your password or your 24-word recovery phrase opens your files. We have neither, so we can't open them for anyone.</p></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Uploading a file</div>
+    <h2>What happens when you upload a photo.</h2>
+    <figure>
+      <svg viewBox="0 0 860 220" role="img" aria-label="On your phone the photo is split into pieces of up to 2 megabytes and each piece is locked with that file's own key. Only locked pieces travel over the internet. Silvora stores locked pieces and cannot open them.">
+        <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+        <g font-size="13" fill="currentColor">
+          <rect x="10" y="20" width="520" height="160" rx="14" fill="none" stroke="#7B6FF8" stroke-width="2"/>
+          <text x="26" y="44" font-size="12" fill="#D4AF6A" font-weight="700" letter-spacing="2">ON YOUR PHONE</text>
+          <rect x="30" y="66" width="120" height="56" rx="10" fill="none" stroke="currentColor"/><text x="90" y="90" text-anchor="middle">photo.jpg</text><text x="90" y="108" text-anchor="middle" font-size="11" opacity=".6">6 MB</text>
+          <rect x="190" y="66" width="140" height="56" rx="10" fill="none" stroke="currentColor"/><text x="260" y="90" text-anchor="middle">Split</text><text x="260" y="108" text-anchor="middle" font-size="11" opacity=".6">3 pieces of 2 MB</text>
+          <rect x="370" y="66" width="140" height="56" rx="10" fill="none" stroke="#D4AF6A" stroke-width="2"/><text x="440" y="90" text-anchor="middle">Lock each piece</text><text x="440" y="108" text-anchor="middle" font-size="11" opacity=".6">this file's own key</text>
+          <line x1="150" y1="94" x2="188" y2="94" stroke="currentColor" marker-end="url(#a)"/>
+          <line x1="330" y1="94" x2="368" y2="94" stroke="currentColor" marker-end="url(#a)"/>
+          <text x="270" y="160" text-anchor="middle" font-size="12" opacity=".65">The filename is locked too, with a different key.</text>
+          <line x1="530" y1="94" x2="628" y2="94" stroke="currentColor" marker-end="url(#a)"/>
+          <text x="579" y="84" text-anchor="middle" font-size="11" opacity=".7">internet</text>
+          <text x="579" y="114" text-anchor="middle" font-size="11" opacity=".7">locked only</text>
+          <rect x="630" y="44" width="220" height="110" rx="14" fill="none" stroke="currentColor"/>
+          <text x="740" y="72" text-anchor="middle" font-weight="700">Silvora's servers</text>
+          <text x="740" y="98" text-anchor="middle" font-family="monospace" font-size="12" opacity=".75">x7#q@!&amp;9f...</text>
+          <text x="740" y="118" text-anchor="middle" font-family="monospace" font-size="12" opacity=".75">k2$Lm*0z...</text>
+          <text x="740" y="140" text-anchor="middle" font-size="11" opacity=".6">no key, can't open</text>
+        </g>
+      </svg>
+      <figcaption>Big files go up in pieces, so a dropped connection only re-sends the piece it was on, not the whole file.</figcaption>
+    </figure>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Your keys</div>
+    <h2>One master key, two ways in.</h2>
+    <p>When you sign up, your phone makes a random <b>master key</b>. It's never sent anywhere readable. Instead, it's locked twice: once with a key made from your password, once with a key made from your <b>24-word recovery phrase</b>. We keep the two locked copies. Only your phone can open either.</p>
+    <p>The master key then makes a <b>separate key for every file</b>, and separate ones again for each filename and each file's tamper check. One key leaking would open one thing, not your whole vault.</p>
+    <figure>
+      <svg viewBox="0 0 860 300" role="img" aria-label="Your password and your recovery phrase each make a key that unlocks the same master key. The master key makes a separate key for every file, every filename and every tamper check.">
+        <defs><marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="currentColor"/></marker></defs>
+        <g font-size="13" fill="currentColor" text-anchor="middle">
+          <rect x="60" y="12" width="190" height="54" rx="10" fill="none" stroke="currentColor"/><text x="155" y="35">Your password</text><text x="155" y="54" font-size="11" opacity=".65">made slow on purpose</text>
+          <rect x="610" y="12" width="200" height="54" rx="10" fill="none" stroke="currentColor"/><text x="710" y="35">24-word recovery phrase</text><text x="710" y="54" font-size="11" opacity=".65">made slow on purpose</text>
+          
+          
+          <line x1="155" y1="66" x2="320" y2="138" stroke="currentColor" marker-end="url(#b)"/>
+          <line x1="710" y1="66" x2="540" y2="138" stroke="currentColor" marker-end="url(#b)"/>
+          <text x="236" y="122" font-size="11" opacity=".8">opens copy 1</text>
+          <text x="628" y="122" font-size="11" opacity=".8">opens copy 2</text>
+          <rect x="320" y="140" width="220" height="56" rx="12" fill="none" stroke="#7B6FF8" stroke-width="2.5"/><text x="430" y="164" font-weight="700">Master key</text><text x="430" y="182" font-size="11" opacity=".7">made on your phone, never sent readable</text>
+          <line x1="430" y1="196" x2="250" y2="236" stroke="currentColor" marker-end="url(#b)"/>
+          <line x1="430" y1="196" x2="430" y2="236" stroke="currentColor" marker-end="url(#b)"/>
+          <line x1="430" y1="196" x2="610" y2="236" stroke="currentColor" marker-end="url(#b)"/>
+          <rect x="170" y="238" width="160" height="44" rx="10" fill="none" stroke="#D4AF6A"/><text x="250" y="265">File key</text>
+          <rect x="350" y="238" width="160" height="44" rx="10" fill="none" stroke="#D4AF6A"/><text x="430" y="265">Filename key</text>
+          <rect x="530" y="238" width="160" height="44" rx="10" fill="none" stroke="#D4AF6A"/><text x="610" y="265">Tamper-check key</text>
+        </g>
+      </svg>
+      <figcaption>A fresh set of the bottom three for every file you store.</figcaption>
+    </figure>
+    <p style="margin-top:18px">This is also why <b>changing your password is instant</b>. Your files are locked with keys from the master key, not from your password, so only the small locked copy of the master key changes.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Logging in</div>
+    <h2>Your password never reaches us.</h2>
+    <p>Most apps send your password to their server when you log in. If that server were ever compromised, or a request were logged by mistake, the password would be exposed with it.</p>
+    <p>Silvora doesn't send it. Your phone turns your password into a <b>login value</b> and sends only that. Our server can check the value is right, but it can't work backwards from it to your password, or to the key that opens your files.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="label">What we see</div>
+    <h2>What we can and can't see.</h2>
+    <div class="tw">
+      <table>
+        <tr><th>Thing</th><th>Can Silvora see it?</th></tr>
+        <tr><td>Your email address and plan</td><td class="no">Yes, to run your account</td></tr>
+        <tr><td>How many files you have, and their sizes</td><td class="no">Yes, to count your storage</td></tr>
+        <tr><td>When files were uploaded, changed or deleted</td><td class="no">Yes, for your file list and sync</td></tr>
+        <tr><td>What's inside your files</td><td class="yes">No, only locked data</td></tr>
+        <tr><td>Your filenames</td><td class="yes">No, locked separately</td></tr>
+        <tr><td>Your password</td><td class="yes">No, it's never sent</td></tr>
+        <tr><td>Your master key</td><td class="yes">No, only two locked copies</td></tr>
+        <tr><td>Your recovery phrase</td><td class="yes">No, shown once, on your phone</td></tr>
+      </table>
+    </div>
+    <p class="note">The full list, including our hosting providers, is in the <a href="/privacy/">privacy policy</a>.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="label">If you forget</div>
+    <h2>Forgot your password? Your recovery phrase.</h2>
+    <p>At sign-up, the app shows you 24 words, once. Write them on paper and keep them somewhere safe. If you forget your password, those 24 words open your vault and let you set a new one.</p>
+    <p><b>If you lose both the password and the phrase, nobody can get your files back.</b> Not you, not us. That isn't a policy choice; it's what "we can't read your files" really means. There's no back door for us to use, so there's no back door for anyone else either.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Tamper checks</div>
+    <h2>If a file is changed, the app notices.</h2>
+    <p>When you upload, your phone records a fingerprint of every piece of the file and locks that list too. When you download, it checks every piece against the list. If a piece has been changed, swapped, reordered, removed, or replaced with an older copy, the app refuses to open the file and tells you, instead of quietly showing you something that isn't what you stored.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="label">On your phone</div>
+    <h2>Protection where the keys live.</h2>
+    <ul>
+      <li><b>Locks itself</b> after a while away, and setting the phone's clock back won't keep it open.</li>
+      <li><b>Blocks screenshots</b> of the vault and hides it from the recent-apps screen.</li>
+      <li><b>Refuses to run</b> on rooted phones or with USB debugging switched on, where other apps could read its memory.</li>
+      <li><b>Slows down guessing:</b> repeated wrong passwords are rate-limited on the server.</li>
+    </ul>
+  </section>
+
+  <section class="reveal">
+    <div class="label">For the technical reader</div>
+    <h2>The details.</h2>
+    <div class="tw">
+      <table>
+        <tr><th>Part</th><th>What Silvora uses</th></tr>
+        <tr><td>Password to key</td><td>Argon2id, 64 MB of memory, 3 passes, on the device; the server refuses weaker settings</td></tr>
+        <tr><td>File and filename encryption</td><td>XChaCha20-Poly1305 with a fresh random 24-byte nonce for every piece</td></tr>
+        <tr><td>Key per file and purpose</td><td>HKDF-SHA256 from the master key, with a separate label for content, filename and tamper check</td></tr>
+        <tr><td>Master key</td><td>256-bit, random, made on the device, stored only wrapped (once under the password key, once under the recovery key)</td></tr>
+        <tr><td>Login</td><td>A value derived from the password key with HKDF is sent instead of the password</td></tr>
+        <tr><td>Recovery phrase</td><td>24 words (BIP39), run through Argon2id with its own salt</td></tr>
+        <tr><td>Tamper check</td><td>SHA-256 of every piece, in an encrypted list checked on download; a missing list where one existed fails closed</td></tr>
+        <tr><td>Pieces</td><td>2 MB, uploaded and resumed one at a time</td></tr>
+        <tr><td>In transit</td><td>HTTPS, on top of everything above</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Being straight with you</div>
+    <h2>What encryption can't fix.</h2>
+    <div class="honest">
+      <p><b>We still see the outline.</b> Your email, file sizes and dates are visible to us, because storage can't work without them.</p>
+      <p><b>A hacked phone is a hacked vault.</b> If someone controls your unlocked phone, they can see what you can see. That's why the app locks itself and refuses rooted devices.</p>
+      <p><b>A weak password is the weak point.</b> Encryption is only as strong as the password guarding it. Use a long one.</p>
+      <p><b>Android only, for now.</b> There's no iPhone app or web version yet.</p>
+      <p><b>No independent audit yet.</b> Silvora is new, and it's built and run from Bengaluru. When an outside security audit is done, its report will be linked here.</p>
+    </div>
+  </section>
+
+  <section class="faq reveal">
+    <div class="label">Questions</div>
+    <h2>People usually ask.</h2>
+    <details><summary>Can anyone at Silvora see my photos?</summary><p>No. They're encrypted on your phone before upload, and the key never leaves your phone in a form anyone else can use. We store scrambled bytes we can't open.</p></details>
+    <details><summary>What if someone orders Silvora to hand over my files?</summary><p>We can only hand over what we hold: your email address, file sizes, timestamps and encrypted data we can't read. We have no way to decrypt your files or filenames.</p></details>
+    <details><summary>What happens to my files if Silvora shuts down?</summary><p>Use Settings, then Export My Data, in the app. It downloads every file and decrypts it on your phone, so you have your own copy that doesn't depend on us.</p></details>
+    <details><summary>Is end-to-end encryption on the free plan too?</summary><p>Yes. Every plan, including the free 1 GB, uses exactly the same encryption. Paying only gets you more space.</p></details>
+    <details><summary>Can I change my password without re-uploading everything?</summary><p>Yes. Your files are locked with keys made from your master key, not from your password. Changing your password only re-locks the master key, which takes a moment.</p></details>
+  </section>
+
+  <section class="cta reveal">
+    <h2>Try it with 1 GB, free.</h2>
+    <p>No card needed. Your encrypted vault is ready in under a minute.</p>
+    <a class="btn" href="{{ play_store_url }}">Get Silvora on Android</a>
+  </section>
+
+</div>
+{% endblock %}

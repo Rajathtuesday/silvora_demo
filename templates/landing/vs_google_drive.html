@@ -1,0 +1,110 @@
+{% extends "landing/_info_base.html" %}
+{% block title %}Silvora vs Google Drive: Which Is More Private? | Silvora{% endblock %}
+{% block description %}An honest comparison of Silvora and Google Drive: who holds the keys, what each company can see, features, apps and price. Drive does more. Silvora sees less.{% endblock %}
+{% block og_title %}Silvora vs Google Drive: an honest comparison{% endblock %}
+{% block og_description %}Who holds the keys, what each company can see, features and price. Drive does more. Silvora sees less.{% endblock %}
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Isn't Google Drive already encrypted?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, Drive encrypts files while they travel and while they're stored. But Google holds the keys, which is how it can show previews, search inside documents and check files for malware. With Silvora, only your phone holds the keys."}},
+    {"@type": "Question", "name": "Should I stop using Google Drive?", "acceptedAnswer": {"@type": "Answer", "text": "Probably not. Drive is excellent for everyday documents and working with other people. Use Silvora for the files you'd be upset to see leaked: ID scans, contracts, medical records, unreleased work."}},
+    {"@type": "Question", "name": "How do I move files from Google Drive to Silvora?", "acceptedAnswer": {"@type": "Answer", "text": "Download them from Drive to your phone, or export everything with Google Takeout, then upload them in the Silvora app. They're encrypted on your phone as they go up."}},
+    {"@type": "Question", "name": "Is Silvora as reliable as Google?", "acceptedAnswer": {"@type": "Answer", "text": "Silvora is much newer and much smaller than Google. For anything you truly can't lose, keep a second copy somewhere else. That's good advice for any cloud service, including Drive."}}
+  ]
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="hero">
+  <div class="eyebrow">An honest comparison</div>
+  <h1>Silvora vs <span>Google Drive</span></h1>
+  <p class="lede">Google Drive is a brilliant product, and for most things it's the right choice. This page is about the one thing it isn't built to do: keep your files private from the company storing them.</p>
+  <div class="actions">
+    <a class="btn" href="{{ play_store_url }}">Get Silvora on Android</a>
+    <a class="btn ghost" href="/security/">How our encryption works</a>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <section class="reveal">
+    <div class="label">The quick answer</div>
+    <h2>Which one is right for you?</h2>
+    <div class="cards two">
+      <div class="card"><span class="k">Google Drive, if you&hellip;</span><p>Edit documents with other people, want lots of free space, use a computer and an iPhone as much as Android, and are comfortable with Google being able to process your files.</p></div>
+      <div class="card pick"><span class="k">Silvora, if you&hellip;</span><p>Want a place for files nobody else should read, not even the company storing them: ID scans, contracts, medical records, client work, personal photos.</p></div>
+    </div>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Side by side</div>
+    <h2>The differences that matter.</h2>
+    <div class="tw">
+      <table>
+        <tr><th style="width:28%">&nbsp;</th><th style="width:36%">Google Drive</th><th>Silvora</th></tr>
+        <tr><td>Who holds the keys</td><td>Google</td><td>Only your phone</td></tr>
+        <tr><td>Can the company read your files?</td><td>Yes. That's how search inside files, previews and malware checks work.</td><td>No. It stores locked data only.</td></tr>
+        <tr><td>Filenames</td><td>Readable by Google</td><td>Encrypted too</td></tr>
+        <tr><td>End-to-end encryption</td><td>Not for personal accounts. Client-side encryption exists only on certain Google Workspace business plans.</td><td>On every plan, including free</td></tr>
+        <tr><td>Forgot your password</td><td>Google account recovery</td><td>Your 24-word recovery phrase. Lose both and nobody can help.</td></tr>
+        <tr><td>Free storage</td><td>15 GB, shared with Gmail and Photos</td><td>1 GB</td></tr>
+        <tr><td>Paid plans</td><td>Google One plans; check Google for current prices</td><td>&#8377;199/month for 100 GB, &#8377;599/month for 1 TB</td></tr>
+        <tr><td>Apps</td><td>Web, Android, iPhone, Windows, Mac</td><td>Android only, for now</td></tr>
+        <tr><td>Editing and sharing</td><td>Docs, Sheets, comments, share links</td><td>No. Silvora stores and protects files.</td></tr>
+        <tr><td>Built in</td><td>USA</td><td>Bengaluru, India</td></tr>
+      </table>
+    </div>
+    <p class="note">Checked October 2026. Google changes its plans from time to time; check Google's own pages for the latest.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Being fair</div>
+    <h2>Where Google Drive is better.</h2>
+    <ul>
+      <li><b>Features.</b> Documents, spreadsheets, comments, real-time editing, search inside PDFs and photos. Silvora does none of that, because it can't read your files.</li>
+      <li><b>Free space.</b> 15 GB free against Silvora's 1 GB.</li>
+      <li><b>Everywhere.</b> Drive works on the web, on iPhone and on your computer. Silvora is an Android app today.</li>
+      <li><b>Forgiving.</b> Forget your Google password and Google can get you back in. Silvora can't, by design.</li>
+      <li><b>Track record.</b> Google has run Drive for over a decade. Silvora is new.</li>
+    </ul>
+  </section>
+
+  <section class="reveal">
+    <div class="label">Where Silvora is different</div>
+    <h2>Private from us, too.</h2>
+    <ul>
+      <li><b>A breach exposes nothing readable.</b> If Silvora's servers were broken into, the attacker would get locked data and no keys.</li>
+      <li><b>Nothing to hand over.</b> We can't be made to decrypt your files, because we can't decrypt them.</li>
+      <li><b>Filenames stay private.</b> "Passport scan.pdf" says a lot on its own. Silvora encrypts names as well as contents.</li>
+      <li><b>No ads, no tracking inside the app.</b> Paying is the whole business model.</li>
+    </ul>
+    <p>The details are on the <a href="/security/">security page</a>.</p>
+  </section>
+
+  <section class="reveal">
+    <div class="label">What I'd suggest</div>
+    <h2>Use both.</h2>
+    <p>You don't have to choose. Keep everyday documents, shared folders and anything you edit with others in Google Drive. Put the files you'd hate to see leaked in Silvora: Aadhaar and PAN scans, passport copies, property papers, contracts, medical reports, salary slips, work you haven't released yet.</p>
+    <p>The free 1 GB is enough for years of ID scans and important PDFs.</p>
+  </section>
+
+  <section class="faq reveal">
+    <div class="label">Questions</div>
+    <h2>People usually ask.</h2>
+    <details><summary>Isn't Google Drive already encrypted?</summary><p>Yes, Drive encrypts files while they travel and while they're stored. But Google holds the keys, which is how it can show previews, search inside documents and check files for malware. With Silvora, only your phone holds the keys.</p></details>
+    <details><summary>Should I stop using Google Drive?</summary><p>Probably not. Drive is excellent for everyday documents and working with other people. Use Silvora for the files you'd be upset to see leaked: ID scans, contracts, medical records, unreleased work.</p></details>
+    <details><summary>How do I move files from Google Drive to Silvora?</summary><p>Download them from Drive to your phone, or export everything with Google Takeout, then upload them in the Silvora app. They're encrypted on your phone as they go up.</p></details>
+    <details><summary>Is Silvora as reliable as Google?</summary><p>Silvora is much newer and much smaller than Google. For anything you truly can't lose, keep a second copy somewhere else. That's good advice for any cloud service, including Drive.</p></details>
+  </section>
+
+  <section class="cta reveal">
+    <h2>Start with your most private files.</h2>
+    <p>1 GB free, end-to-end encrypted, no card needed.</p>
+    <a class="btn" href="{{ play_store_url }}">Get Silvora on Android</a>
+  </section>
+
+</div>
+{% endblock %}

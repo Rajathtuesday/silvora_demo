@@ -178,10 +178,16 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "silvora_backend.context_processors.site_links",
             ],
         },
     },
 ]
+
+# Where every download button on the public site points (see
+# silvora_backend/context_processors.py). The store listing serves open
+# testing and production alike.
+PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=cloud.silvora.app"
 
 WSGI_APPLICATION = "silvora_backend.wsgi.application"
 

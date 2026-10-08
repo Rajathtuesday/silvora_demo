@@ -24,7 +24,7 @@ from django.templatetags.static import static as static_url
 from django.utils import timezone
 from .healthcheck import healthcheck
 from .legal import PrivacyPolicyView, TermsOfServiceView
-from .pages import LandingView
+from .pages import PUBLIC_PAGES, LandingView, SecurityView, VsGoogleDriveView
 from .admin_tools import send_tester_switch_email
 from billing.views import billing_checkout_page
 
@@ -33,15 +33,14 @@ from users.views import ThrottledTokenObtainPairView, SafeTokenRefreshView
 
 
 def robots_txt(request):
-    content = """User-agent: *
+    allow = "\n".join(f"Allow: {page.path}" for page in PUBLIC_PAGES)
+    content = f"""User-agent: *
 
-# Public — the marketing and legal pages
-Allow: /
-Allow: /privacy/
-Allow: /terms/
+# Public: the marketing and legal pages (silvora_backend/pages.py)
+{allow}
 
 # Everything else is either an API, an authenticated app surface, or a
-# checkout link that only works with a signed token in the query string —
+# checkout link that only works with a signed token in the query string;
 # none of it is meant to be crawled or indexed.
 Disallow: /api/
 Disallow: /admin/
@@ -53,29 +52,19 @@ Sitemap: https://silvora.cloud/sitemap.xml"""
 
 
 def sitemap_xml(request):
-    # Public, indexable pages only. lastmod is generated fresh on every
-    # request rather than hand-typed, so it never goes stale.
+    # Public, indexable pages only (PUBLIC_PAGES in pages.py). lastmod is
+    # generated fresh on every request rather than hand-typed, so it never
+    # goes stale.
     today = timezone.localdate().isoformat()
+    urls = "".join(f"""
+  <url>
+    <loc>https://silvora.cloud{page.path}</loc>
+    <lastmod>{today}</lastmod>
+    <changefreq>{page.changefreq}</changefreq>
+    <priority>{page.priority}</priority>
+  </url>""" for page in PUBLIC_PAGES)
     content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://silvora.cloud/</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://silvora.cloud/privacy/</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
-    <loc>https://silvora.cloud/terms/</loc>
-    <lastmod>{today}</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}
 </urlset>"""
     return HttpResponse(content, content_type='application/xml')
 
@@ -129,6 +118,8 @@ urlpatterns = [
     path('healthz/', healthcheck, name='healthcheck'),
 
     # Legal
+    path('security/', SecurityView.as_view(), name='security'),
+    path('vs-google-drive/', VsGoogleDriveView.as_view(), name='vs_google_drive'),
     path('privacy/', PrivacyPolicyView.as_view(), name='privacy_policy'),
     path('terms/', TermsOfServiceView.as_view(), name='terms_of_service'),
 
