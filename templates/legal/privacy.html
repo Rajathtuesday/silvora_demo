@@ -191,7 +191,7 @@
 <div class="wrap">
 
   <h1>Privacy Policy</h1>
-  <div class="updated">Last updated: 6 August 2026</div>
+  <div class="updated">Last updated: 8 October 2026</div>
 
   <div class="card beta reveal">
     <strong>Beta software.</strong> Silvora is currently in a closed/limited beta.
@@ -230,9 +230,11 @@
     <ul>
       <li><strong>Email address</strong> - used as your account identifier (login)
         and, if you choose, for account-related communication (e.g. security notices).</li>
-      <li><strong>Password</strong> - stored only as a one-way hash using Django's
-        standard password hashing. We never store, log, or have access to your
-        plaintext password.</li>
+      <li><strong>Password</strong> - never sent to us. When you log in, your device
+        derives a separate login value from your password and sends only that; we
+        store a one-way hash of the login value using Django's standard password
+        hashing. It can't be turned back into your password or into the key that
+        protects your files.</li>
     </ul>
 
     <h3>Encryption keys and recovery</h3>

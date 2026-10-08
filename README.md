@@ -13,13 +13,13 @@ A multi-tenant SaaS backend for an encrypted personal vault product: users regis
 The server never runs the encryption or key derivation itself. Everything sensitive happens on the client (see the Flutter app's `lib/crypto/`); this backend only stores and returns opaque, already-encrypted values.
 
 - **Master key**: generated on-device at registration, 256 bits, never leaves the device unencrypted.
-- **Password path**: the client derives a KEK from the user's password with Argon2id, then wraps the master key with it (XChaCha20-Poly1305). The server stores that wrapped envelope (`MasterKeyEnvelope.enc_master_key` / `enc_master_key_nonce`) plus the Argon2 parameters used (`kdf_salt`, `kdf_memory_kb`, `kdf_iterations`, `kdf_parallelism`), so a future login can fetch them and re-derive the same KEK.
+- **Password path**: the client derives a KEK from the user's password with Argon2id, then wraps the master key with it (XChaCha20-Poly1305). The password itself never reaches the server: login, change-password, recovery and account deletion all send `login_auth_key`, derived from the KEK with HKDF (`info="silvora-login-auth"`), and Django stores only a password hash of that value. `POST api/auth/login-kdf-params/` hands the client the salt and Argon2 settings it needs before it can derive the key. Existing accounts were moved over with the `cutover_login_auth_key` command (31 Aug 2026). The server stores that wrapped envelope (`MasterKeyEnvelope.enc_master_key` / `enc_master_key_nonce`) plus the Argon2 parameters used (`kdf_salt`, `kdf_memory_kb`, `kdf_iterations`, `kdf_parallelism`), so a future login can fetch them and re-derive the same KEK.
 - **Recovery path, independent of the password**: at registration the client also generates a 24-word recovery phrase, derives a second KEK from it (also Argon2id, its own salt), and wraps a second, separate copy of the same master key. The server stores that second envelope too (`enc_master_key_recovery` and friends), plus `recovery_auth_hash`, a Django password-hash of a value the client derives from the phrase (via HKDF) specifically so the server can verify someone typed the right phrase back without ever learning the phrase itself.
 - **Server-side KDF floors**: even though the server never runs Argon2, `users/serializers.py` still rejects unreasonably weak parameters a client might send (memory below 64MB, fewer than 3 iterations, parallelism outside 1 to 8), so the server never faithfully stores and replays trivially brute-forceable settings.
 - **Per-file, per-filename, and per-integrity-manifest keys** are all derived client-side from the master key via HKDF, each with its own domain-separated label, so a leaked key for one purpose (say, the integrity key) can't be reused to decrypt the file itself.
-- **Integrity manifests**: alongside the encrypted file, the client uploads a separate, client-signed manifest of per-chunk hashes, encrypted and opaque to the server. The server can't read it, but a commit is refused until one exists (`FileRecord.integrity_established`), which is what lets the server later prove a manifest was present at commit time even if it's since been deleted.
+- **Integrity manifests**: alongside the encrypted file, the client uploads a separate manifest of per-chunk hashes, encrypted and opaque to the server. The server can't read it, but a commit is refused until one exists (`FileRecord.integrity_established`), which is what lets the server later prove a manifest was present at commit time even if it's since been deleted. A manifest that existed and is now missing fails closed on download, and the client enforces a monotonic version so an older, validly signed copy can't be replayed.
 
-If you're looking for the deeper spec, `docs/CRYPTOGRAPHY_SPEC.md` exists but is currently **out of date**: it describes AES-256-GCM, while the actual implementation (confirmed by both this repo's nonce-length validation and the Flutter client's crypto code) is XChaCha20-Poly1305. Trust this README and the code over that doc until it's corrected.
+The full spec is `docs/CRYPTOGRAPHY_SPEC.md` (XChaCha20-Poly1305, both envelopes, login authentication, recovery authentication, integrity, KDF floors). The plain-language version for users is the public page `/security/`.
 
 ### Multi-tenancy
 
@@ -47,7 +47,10 @@ Object keys follow a fixed path: `Silvora/tenants/{tenant_id}/users/{user_id}/fi
 
 Real recurring subscriptions through Razorpay, on Silvora's own Razorpay account (distinct from any tenant-owned Razorpay keys elsewhere in other projects). There's no official Razorpay SDK here; `billing/services/razorpay_client.py` talks to the API directly with `requests`, and verifies webhook signatures manually with HMAC-SHA256.
 
-Subscriptions are created through a **signed web checkout link**, not an in-app purchase flow, specifically to sidestep Google Play Billing's requirement that digital subscriptions purchased inside an Android app go through Play Billing. `GET api/billing/web-link/` returns a 10-minute signed URL; `/billing/checkout/` is the actual public checkout page, where the token itself is the credential.
+There are two ways to pay, side by side:
+
+- **Razorpay, on the web.** `GET api/billing/web-link/` returns a 10-minute signed URL; `/billing/checkout/` is the public checkout page, where the token itself is the credential.
+- **Google Play Billing, in the app**, which Play requires for digital subscriptions bought inside an Android app. The app asks `GET api/billing/play/account-id/` for an obfuscated account ID, buys through Play, and sends the purchase token to `POST api/billing/play/verify/`, which checks it with the Google Play Developer API before changing the plan. Google's Real-time Developer Notifications arrive at `POST api/billing/play/rtdn/` (models `PlayBillingPlan`, `PlayBillingSubscription`). A purchase can only ever upgrade the account it was bought for.
 
 Webhook idempotency doesn't use a separate event-ID ledger. Instead, each handler guards itself with the row's own state: `subscription.activated` and `subscription.charged` just set fields, so replaying them is harmless; `payment.failed` is deduped with a 24-hour timestamp window rather than a boolean, so a genuinely new failure weeks later still fires a notification; `subscription.cancelled` and `subscription.completed` explicitly no-op if the subscription is already in that state, so `grace_ends_at`/`purge_at` don't keep getting pushed forward on webhook redelivery. Creating a second subscription for a plan the user is already subscribed to is blocked at the service layer (`AlreadySubscribed`), except that a duplicate `created`-status attempt for the *same* plan reuses the existing row, which is what makes a page reload or double-tap on checkout harmless.
 
@@ -65,14 +68,16 @@ JWT via `djangorestframework-simplejwt` (60-minute access tokens, 7-day refresh,
 | `files` | `FileRecord` state machine, chunked upload/download, integrity manifests, Trash |
 | `billing` | `RazorpayPlan` / `Subscription`, checkout, webhook, grace period and purge cron |
 | `tenants` | Per-user tenant isolation. No API surface of its own; a data model, not a feature |
+| `feedback` | Beta-tester feedback form at `/beta-feedback/` (`TesterFeedback`, read-only in Django admin) |
 
 ## API surface
 
 **Auth and account** (`api/auth/`, plus two paths registered at the project's root URLconf):
 - `POST api/auth/register/`, `GET api/auth/me/`, `GET api/auth/verify-email/<token>/`, `POST api/auth/resend-verification/`
+- `POST api/auth/login-kdf-params/` (public: the salt and Argon2 settings for an email)
 - `GET api/auth/master-key/`, `POST api/auth/master-key/setup/`, `POST api/auth/master-key/change-password/`
 - `POST api/auth/recover/start/`, `POST api/auth/recover/` (both logged-out)
-- `POST api/auth/account/delete/` (password-confirmed)
+- `POST api/auth/account/delete/` (confirmed with `login_auth_key`; purges R2 before the database rows)
 - `POST api/auth/token/`, `POST api/auth/token/refresh/`
 
 **Files** (mounted at the project root, no `/api/` prefix):
@@ -82,14 +87,17 @@ JWT via `djangorestframework-simplejwt` (60-minute access tokens, 7-day refresh,
 - `GET /download/file/<id>/manifest/`, `GET /download/file/<id>/integrity/`, `GET /download/file/<id>/chunk/<index>/`
 
 **Billing**:
-- `GET api/billing/web-link/`, `POST api/billing/webhook/`
+- `GET api/billing/web-link/`, `POST api/billing/webhook/` (Razorpay)
+- `GET api/billing/play/account-id/`, `POST api/billing/play/verify/`, `POST api/billing/play/rtdn/` (Google Play)
 - `GET /billing/checkout/` (public, token-authenticated)
 
-**Other**: `/privacy/`, `/terms/` (legal pages), `/healthz/` (health check).
+**Public site** (Django templates in `templates/landing/` and `templates/legal/`): `/`, `/security/`, `/vs-google-drive/`, `/privacy/`, `/terms/`. They're listed once in `PUBLIC_PAGES` (`silvora_backend/pages.py`), which `sitemap.xml` and `robots.txt` both read. Every download button uses `settings.PLAY_STORE_URL` through the `site_links` context processor.
+
+**Other**: `/healthz/` (health check), `/beta-feedback/` (tester form), `/admin-tools/send-tester-email/` (staff only), `/app-ads.txt` (deliberately empty: no ads).
 
 ## Requirements
 
-Python 3.12. PostgreSQL in production (`DATABASE_URL`); SQLite is the local default if that's unset, which is fine for development.
+Python 3.12, Django 5.2 LTS. PostgreSQL (Neon) in production (`DATABASE_URL`); SQLite is the local default if that's unset, which is fine for development.
 
 ## Running locally
 
@@ -117,6 +125,8 @@ With no R2 credentials set, uploads still work end to end, just against local di
 | `RESEND_API_KEY` | For email | SMTP password for the Resend relay (`EMAIL_HOST_USER` is always the literal string `resend`) |
 | `SITE_BASE_URL` | No | Used to build links in verification/billing emails, defaults to `https://api.silvora.cloud` |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | For billing | Silvora's own Razorpay account |
+| `GOOGLE_PLAY_PACKAGE_NAME` | No | Defaults to `cloud.silvora.app` |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` or `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON_PATH` | For Play Billing | Service account allowed to call the Play Developer API |
 
 Create a `.env` file in this directory to set these locally. `settings.py` loads it automatically via `python-dotenv` (real environment variables still take precedence).
 
@@ -128,7 +138,7 @@ Create a `.env` file in this directory to set these locally. `settings.py` loads
 python manage.py test
 ```
 
-114 tests across all four apps (users 31, files 58, billing 25, tenants 0). CI (`.github/workflows/ci.yml`) runs `python manage.py check` and the full suite on every push to `main` and every pull request.
+188 tests (8 Oct 2026): users 53, files 74, billing 51, public site 10. `python manage.py test --parallel 6` runs them in about two minutes. CI (`.github/workflows/ci.yml`) runs `python manage.py check` and the full suite on every push to `main` and every pull request.
 
 ## Scheduled jobs
 
@@ -145,15 +155,15 @@ All three can be run manually with `python manage.py <command_name>`.
 
 Render (`render.yaml`): one web service running `gunicorn silvora_backend.wsgi:application`, build step runs `pip install`, `collectstatic`, and `migrate`, plus the two cron jobs above. `DJANGO_SECRET_KEY` is generated by Render itself; `DATABASE_URL`, the R2 credentials, and email credentials are all set manually in the Render dashboard rather than committed. The Razorpay variables and `SITE_BASE_URL` aren't declared in `render.yaml` at all, so if billing works in production, they're being set manually outside the blueprint. Confirm this is actually true rather than assuming it.
 
-## Known gaps, worth cleaning up
+## Known gaps
 
-Being direct about the current rough edges, since a README that hides them isn't useful to future-you:
+- **`.env.example` is behind.** It still lists `ALLOWED_HOSTS`, which `settings.py` doesn't read (allowed hosts are a list in code), and it doesn't mention `RESEND_API_KEY`, `SITE_BASE_URL`, the `RAZORPAY_*` or the `GOOGLE_PLAY_*` variables. Use the table above.
+- **`cleanup_abandoned_uploads` isn't scheduled.** See Scheduled jobs.
+- **No independent security audit yet.** The public `/security/` page says so too.
+- **Android only.** No iOS app or web client yet.
 
-- **`docs/CRYPTOGRAPHY_SPEC.md` is stale.** It describes AES-256-GCM; the real cipher is XChaCha20-Poly1305 (confirmed against both this repo's 24-byte nonce validation and the Flutter client's crypto code). It also doesn't mention the dual password/recovery-phrase envelope structure or the integrity-manifest system at all, both of which are real, tested, shipped features.
-- **Dead code**: `files/r2_storage.py` (entirely commented out, three superseded drafts) and `files/storage.py` (`BaseStorage`/`LocalStorage`, predates the current `StorageGateway` abstraction) are both unused leftovers from an earlier design. `files/services/manifest_service.py` has a large commented-out implementation followed by a class that's just `pass`, deliberately, since the server isn't meant to interpret manifest contents, but the dead code around it should probably just be deleted.
-- **`keep_alive.py` is broken.** It pings `{APP_URL}/health/` in a loop, but `APP_URL` is never defined in `settings.py` (the real health check path is `/healthz/`, not `/health/`), and it isn't scheduled anywhere regardless.
-- **`project_review.md` and `FIX_PLAN_2.md`**, previously referenced from this README, don't exist in the current repo snapshot. That reference has been removed here rather than left broken.
+(The dead code and the broken `keep_alive.py` listed here before have since been deleted, and `docs/CRYPTOGRAPHY_SPEC.md` now matches the implementation.)
 
 ## Full architecture docs
 
-`docs/` has more detail on access control, data flow, storage layout, threat model, and incident response. Treat these as directional rather than fully authoritative until `CRYPTOGRAPHY_SPEC.md` in particular gets a pass to match the current implementation.
+`docs/` has the full set: `CRYPTOGRAPHY_SPEC.md`, `THREAT_MODEL.md`, `SECURITY_ARCHITECTURE.md`, `ACCESS_CONTROL_MODEL.md`, `DATA_FLOW.md`, `STORAGE_MODEL.md` and `INCIDENT_RESPONSE.md`, brought up to date with the code in September 2026.

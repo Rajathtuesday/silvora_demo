@@ -8,6 +8,10 @@ project history. For anything earlier, `git log` is the source of truth.
 
 ## 2026-10-08
 
+### Docs
+- README brought up to date: login with `login_auth_key`, Google Play Billing beside Razorpay, the `feedback` app, the public site and its shared page list, Play Billing environment variables, 188 tests, and a current known-gaps list (the old dead-code and stale-spec warnings were already fixed).
+- Privacy policy: the password line now says what happens since 31 Aug 2026 (the password is never sent; only a hash of a derived login value is stored). Last updated 8 Oct 2026.
+
 ### Added
 - **Two public pages: `/security/` and `/vs-google-drive/`.** Security explains, in plain words and then in detail, how files are locked on the phone, the key family (master key, password and recovery paths, per-file keys), login without sending the password, what the server can and can't see (matches the privacy policy), tamper checks, device protections and honest limits (metadata, a hacked phone, weak passwords, Android only, no independent audit yet). The comparison is fair to Drive (features, free space, platforms, recovery) and says where Silvora differs. Both share `templates/landing/_info_base.html` and carry FAQ structured data matching the visible questions. Footer links on every public page.
 
