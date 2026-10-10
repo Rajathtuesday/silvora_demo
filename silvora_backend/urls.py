@@ -25,7 +25,7 @@ from django.utils import timezone
 from .healthcheck import healthcheck
 from .legal import PrivacyPolicyView, TermsOfServiceView
 from .pages import PUBLIC_PAGES, LandingView, SecurityView, VsGoogleDriveView
-from .admin_tools import send_tester_switch_email
+from .admin_tools import send_tester_switch_email, tester_email_status, retry_tester_email
 from billing.views import billing_checkout_page
 
 # SimpleJWT views
@@ -125,6 +125,8 @@ urlpatterns = [
 
     # Internal, staff-only tools
     path('admin-tools/send-tester-email/', send_tester_switch_email, name='send_tester_switch_email'),
+    path('admin-tools/send-tester-email/<int:pk>/', tester_email_status, name='send_tester_email_status'),
+    path('admin-tools/send-tester-email/<int:pk>/retry/', retry_tester_email, name='retry_tester_email'),
 ]
 
 # Serve media in development

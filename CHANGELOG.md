@@ -8,6 +8,9 @@ project history. For anything earlier, `git log` is the source of truth.
 
 ## 2026-10-10
 
+### Fixed
+- **The staff tester-email tool died with a server error on a 31-person send-out.** It sent every email inside the web request, one by one, and the request ran into gunicorn's 30-second limit after the 30th email, so the last tester never got it and the page showed an internal server error. Sending now runs in the background: the form records one row per recipient (new `TesterEmail` and `TesterEmailRecipient` models in the `feedback` app) and returns at once to a status page that refreshes until it is done. Emails are paced 0.6 s apart for the mail provider's rate limit. Each row is claimed before sending, so a double click or a retry can never email someone twice; anyone who already received the same subject is skipped, and an "already received" box lets you skip addresses by hand. A "send again to the ones not sent" button retries only the failed rows and any a stopped attempt left behind. 13 new tests (`silvora_backend/tests_admin_tools.py`).
+
 ### Changed
 - **The public pages now say the app is on Google Play in early access**, instead of "Join Android Beta" and "currently in closed testing". The button text is "Get Silvora on Android" (and "Get the app" in the navigation bars), and it opens the store listing. Google approved app version 1.0.7 for open testing on 2026-10-10, so the store page is live.
 

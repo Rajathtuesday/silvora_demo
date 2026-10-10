@@ -36,3 +36,51 @@ class TesterFeedback(models.Model):
 
     def __str__(self):
         return f"Feedback #{self.pk} ({self.rating}/5, {self.created_at:%Y-%m-%d})"
+
+
+class TesterEmail(models.Model):
+    """One send-out from the staff email tool: the message, and when it finished.
+
+    Sending happens in the background, so every recipient gets a row in
+    TesterEmailRecipient and the status page reads progress from there.
+    """
+
+    subject = models.CharField(max_length=300)
+    body = models.TextField()
+    invalid_addresses = models.TextField(blank=True)  # one per line, as typed
+    created_by = models.ForeignKey(
+        "users.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.subject} ({self.created_at:%Y-%m-%d %H:%M})"
+
+
+class TesterEmailRecipient(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Waiting"
+        SENDING = "sending", "Sending"
+        SENT = "sent", "Sent"
+        FAILED = "failed", "Failed"
+        SKIPPED = "skipped", "Skipped"
+
+    email_out = models.ForeignKey(TesterEmail, on_delete=models.CASCADE, related_name="recipients")
+    address = models.EmailField()
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    note = models.CharField(max_length=500, blank=True)  # failure reason or why it was skipped
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["pk"]
+        constraints = [
+            models.UniqueConstraint(fields=["email_out", "address"], name="one_row_per_address_per_send_out"),
+        ]
+
+    def __str__(self):
+        return f"{self.address}: {self.status}"

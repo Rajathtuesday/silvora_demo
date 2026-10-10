@@ -1,0 +1,63 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+{% if still_going %}<meta http-equiv="refresh" content="3">{% endif %}
+<title>Send-out status - Silvora</title>
+<link rel="icon" type="image/x-icon" href="{% static 'favicon/favicon.ico' %}">
+{% include "admin_tools/_style.html" %}
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-name">Silvora &middot; internal tools</span>
+  </div>
+  <h1>{{ email_out.subject }}</h1>
+  <div class="subtitle">
+    Started {{ email_out.created_at|date:"j M Y, H:i" }}.
+    {% if still_going %}Sending now; this page refreshes every 3 seconds.{% else %}Finished {{ email_out.finished_at|date:"H:i" }}.{% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Progress</h2>
+    <div class="count-row">
+      <div><div class="n" style="color:var(--green)" id="count-sent">{{ counts.sent }}</div><div class="l">Sent</div></div>
+      <div><div class="n" style="color:var(--gold)" id="count-waiting">{{ counts.pending|add:counts.sending }}</div><div class="l">Waiting</div></div>
+      <div><div class="n" style="color:var(--red)" id="count-failed">{{ counts.failed }}</div><div class="l">Failed</div></div>
+      <div><div class="n" style="color:var(--text-secondary)" id="count-skipped">{{ counts.skipped }}</div><div class="l">Skipped</div></div>
+      <div><div class="n" style="color:var(--text-muted)">{{ invalid|length }}</div><div class="l">Invalid</div></div>
+    </div>
+    {% if retryable %}
+      <form method="post" action="{% url 'retry_tester_email' email_out.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn">Send again to the ones not sent</button>
+        <div class="hint">Only failed rows, and rows a stopped attempt left behind, are sent. Anyone marked Sent is never emailed again.</div>
+      </form>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Recipients</h2>
+    <table class="rows">
+      {% for r in recipients %}
+        <tr id="row-{{ r.pk }}">
+          <td class="addr">{{ r.address }}</td>
+          <td><span class="status-pill st-{{ r.status }}">{{ r.get_status_display }}</span></td>
+          <td class="note">{{ r.note }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+    {% if invalid %}
+      <ul class="result-list">
+        {% for a in invalid %}<li class="fail">not a valid address, not sent: {{ a }}</li>{% endfor %}
+      </ul>
+    {% endif %}
+  </div>
+
+  <a class="btn" href="{% url 'send_tester_switch_email' %}">New send-out</a>
+</div>
+</body>
+</html>
