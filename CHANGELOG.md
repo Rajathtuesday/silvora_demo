@@ -6,6 +6,13 @@ project history. For anything earlier, `git log` is the source of truth.
 
 ---
 
+## 2026-10-10
+
+### Changed
+- **The public pages now say the app is on Google Play in early access**, instead of "Join Android Beta" and "currently in closed testing". The button text is "Get Silvora on Android" (and "Get the app" in the navigation bars), and it opens the store listing. Google approved app version 1.0.7 for open testing on 2026-10-10, so the store page is live.
+
+---
+
 ## 2026-10-08
 
 ### Docs
